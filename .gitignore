@@ -5,7 +5,7 @@
 .vscode/launch.json
 .vscode/ipch
 .vscode/**/*
-*PlatformIO/*
+testProject/*/PlatformIO/*
 claude-dev
 changes
 claude-instructions.md

@@ -124,10 +124,35 @@ workspace_dir = .pio.nosync
 default_envs = myBoard
 
 [env:myBoard]
-platform = <select platform with "PIO Home" -> Platforms>
-board = <select board with "PIO Home" -> Boards>
+;-- esp32
+#platform = espressif32
+#board = esp32dev
+#board_build.partitions = min_spiffs.csv
+#board_build.filesystem = SPIFFS
+
+;-- esp8266
+#platform = espressif8266
+#board = esp12e
+#board_build.filesystem = LittleFS
+
+;-- attiny85
+#platform = atmelavr
+#board = attiny85
+#upload_protocol = usbtiny
+#upload_speed = 19200
+;-- Clock source Int.RC Osc. 8MHz PWRDWN/RESET: 6 CK/1
+#board_fuses.lfuse = 0xE2
+;-- Serial program downloading (SPI) enabled
+;-- brown-out Detection 1.8v (0xDE)
+;board_fuses.hfuse = 0xDE    
+;-- brown-out detection 2.7v (0xDD)
+#board_fuses.hfuse = 0xDD    
+;-- brown-out detection 4.3v (0xDC)
+;board_fuses.hfuse = 0xDC    
+#board_fuses.efuse = 0xFF
+
 framework = arduino
-board_build.filesystem = <if appropriate>
+board_build.filesystem = LittleFS
 monitor_speed = 115200
 upload_speed = 115200
 upload_port = <select port like "/dev/cu.usbserial-3224144">
@@ -137,10 +162,11 @@ build_flags =
 lib_ldf_mode = deep+
 
 lib_deps =
-\t<select libraries with "PIO Home" -> Libraries
+;\t<select libraries with "PIO Home" -> Libraries
 
 monitor_filters =
-  esp8266_exception_decoder
+;-- esp8266
+#  esp8266_exception_decoder
 """
         with open(platformio_ini_path, 'w') as f:
             f.write(platformio_ini_content)
@@ -391,7 +417,7 @@ def copy_project_files(project_folder, pio_src, pio_include):
 #------------------------------------------------------------------------------------------------------
 def extract_global_vars(pio_src, pio_include, project_name):
     """
-    Extract global variable definitions from .ino files and the main project header file.
+    Extract global variable definitions from .ino files, .cpp files, and the main project header file.
     Only variables declared outside of all function blocks are considered global.
     """
     global_vars = {}
