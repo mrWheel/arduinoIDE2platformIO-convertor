@@ -7,3 +7,4 @@
 .vscode/**/*
 *PlatformIO/*
 functions
+claude-instructions.md
