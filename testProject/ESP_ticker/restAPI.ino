@@ -8,7 +8,6 @@
 ***************************************************************************      
 */
 
-
 //=======================================================================
 void processAPI() 
 {
@@ -146,7 +145,6 @@ void sendDeviceInfo()
   );
   sendNestedJsonObj("ssid", WiFi.SSID().c_str());
   sendNestedJsonObj("wifirssi", WiFi.RSSI());
-//sendNestedJsonObj("uptime", upTime());
 
   sendNestedJsonObj("lastreset", lastReset);
 
@@ -158,13 +156,19 @@ void sendDeviceInfo()
 //=======================================================================
 void sendDeviceTime() 
 {
+  struct tm* timeinfo;
   char actTime[50];
   
   sendStartJsonObj("devtime");
-  snprintf(actTime, 49, "%04d-%02d-%02d %02d:%02d:%02d", year(), month(), day()
-                                                       , hour(), minute(), second());
+  // Get current time
+  time(&now);
+  timeinfo = localtime(&now);  // This is now correct
+ 
+  snprintf(actTime, 49, "%02d-%02d-%04d %02d:%02d"
+           , timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900
+           , timeinfo->tm_hour, timeinfo->tm_min);
   sendNestedJsonObj("dateTime", actTime); 
-  sendNestedJsonObj("epoch", (int)now());
+  sendNestedJsonObj("epoch", (uint32_t)now);
 
   sendEndJsonObj();
 

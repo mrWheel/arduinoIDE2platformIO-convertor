@@ -37,14 +37,10 @@
 
 #include <WiFiUdp.h>            // part of ESP8266 Core https://github.com/esp8266/Arduino
 #ifdef USE_UPDATE_SERVER
-//#include "ESP8266HTTPUpdateServer.h"
   #include <ModUpdateServer.h>   // https://github.com/mrWheel/ModUpdateServer
   #include "updateServerHtml.h"
 #endif
 #include <WiFiManager.h>       // version 0.15.0 - https://github.com/tzapu/WiFiManager
-// included in main program: #include <TelnetStream.h>       // Version 0.0.1 - https://github.com/jandrassy/TelnetStream
-//#include <FS.h>                // part of ESP8266 Core https://github.com/esp8266/Arduino
-
 
 ESP8266WebServer        httpServer (80);
 ESP8266HTTPUpdateServer httpUpdater(true);

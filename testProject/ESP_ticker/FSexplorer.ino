@@ -124,11 +124,7 @@ void APIlistFiles()             // Senden aller Daten an den Client
   //strncat(dirMap[fileNr].Name, dir.fileName().substring(1).c_str(), 29); // remove leading '/'
     strncat(dirMap[fileNr].Name, dir.fileName().c_str(), 29); 
     dirMap[fileNr].Size = dir.fileSize();
-    //--- Skip files in newsFiles map
-    //-aaw-if ((dir.fileName().indexOf("/newsFiles") == -1) && (dir.fileSize() > 0))
-    //{
-      fileNr++;
-    //}
+    fileNr++;
   }
   DebugTf("fileNr[%d], Max[%d]\r\n", fileNr, MAX_FILES_IN_LIST);
 

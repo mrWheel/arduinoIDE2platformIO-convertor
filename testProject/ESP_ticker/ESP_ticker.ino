@@ -114,18 +114,6 @@ int16_t calculateIntensity()
   int intensity = map(valueLDR, settingLDRlowOffset, settingLDRhighOffset,  0, settingMaxIntensity);
   //DebugTf("map(%d, %d, %d, 0, %d) => [%d]\r\n", valueLDR, settingLDRlowOffset, settingLDRhighOffset
   //                                                      , 0                  , settingMaxIntensity);
-
-
-/*
-  if ( ((minute() % 15) == 0) && (lastMinute != minute()) ) 
-  {
-    lastHour = hour();
-    lastMinute = minute();
-    char line[50];
-    snprintf(line, sizeof(line), "valueLDR[%4d] intensity[%2d]", valueLDR, intensity);
-    writeToLog(line);
-  }
-*/
   
   return intensity;
 
@@ -135,10 +123,33 @@ int16_t calculateIntensity()
 //---------------------------------------------------------------------
 char *updateTime()
 {
-  snprintf(timeMsg, 20, "%02d : %02d", hour(), minute()); 
+  time(&now);
+  snprintf(timeMsg, 20, "%02d : %02d", localtime(&now)->tm_hour, localtime(&now)->tm_min);
   return timeMsg;
 
 } // updateTime()
+
+
+//---------------------------------------------------------------------
+bool getTheLocalTime(struct tm *info, uint32_t ms)
+{
+  //-- getLocalTime() is not implemented in the ArduinoIDE
+  //-- so this is a 'work around' function
+  uint32_t start = millis();
+  time_t now;
+  while((millis()-start) <= ms)
+  {
+    time(&now);
+    localtime_r(&now, info);
+    if(info->tm_year > (2016 - 1900))
+    {
+      return true;
+    }
+    delay(10);
+  }
+  return false;
+
+} // getTheLocalTime()
 
 
 //---------------------------------------------------------------------
@@ -265,7 +276,13 @@ void setup()
   P.begin();
   P.displayClear();
   P.displaySuspend(false);
-  P.displayScroll(actMessage, PA_LEFT, PA_SCROLL_LEFT, (MAX_SPEED - settingTextSpeed));
+  P.setIntensity(2);
+  P.displayScroll(actMessage, PA_LEFT, PA_NO_EFFECT, 20);
+  P.setTextEffect(PA_SCROLL_LEFT, PA_NO_EFFECT);
+  do
+  {
+    yield();
+  } while( !P.displayAnimate() );
 
   actMessage[0]  = '\0';
   
@@ -331,14 +348,36 @@ void setup()
 
   startMDNS(settingHostname);
     
-  //--- ezTime initialisation
-  setDebug(INFO);  
-  waitForSync(); 
-  CET.setLocation(F("Europe/Amsterdam"));
-  CET.setDefault(); 
-  
-  DebugTln("UTC time: "+ UTC.dateTime());
-  DebugTln("CET time: "+ CET.dateTime());
+  DebugTln("Get time from NTP");
+  timeSync.setup();
+  timeSync.sync(300);
+  time(&now);
+  if (localtime(&now)->tm_year > 120)
+  {
+    timeSynced = true;
+    Serial.println("Time synchronized with NTP Service");
+  }
+  else
+  {
+    timeSynced = false;
+    Serial.println("Could not synchronize time with NTP Service");
+  }
+
+  time(&now);
+  Serial.println("-------------------------------------------------------------------------------");
+  if (!getTheLocalTime(&timeinfo, 10000))
+  {
+    Debugln("Time       : Failed to obtain time!");
+  }
+  else
+  {
+    Debugf( "Time       : %04d-%02d-%02d %02d:%02d:%02d\r\n", localtime(&now)->tm_year+1900
+                   , localtime(&now)->tm_mon+1
+                   , localtime(&now)->tm_mday
+                   , localtime(&now)->tm_hour
+                   , localtime(&now)->tm_min
+                   , localtime(&now)->tm_sec);
+  }
 
   nrReboots++;
   writeLastStatus();
@@ -397,8 +436,6 @@ void setup()
 //=====================================================================
 void loop()
 {
-//handleNTP();
-  events(); // trigger ezTime update etc.
   httpServer.handleClient();
   MDNS.update();
   yield();
@@ -431,21 +468,31 @@ void loop()
     yield();
     msgType++;
     DebugTf("msgType[%d]\r\n", msgType);
+    time(&now);
+    if (localtime(&now)->tm_year > 120) timeSynced = true;
+
     
     switch(msgType)
     {
-      case 1:   if (!(millis() > timeTimer))  return;
+      case 1:   if (!(millis() > timeTimer))  { DebugTln("Not yet time to display weekday"); return; }
+                if (!timeSynced)   { DebugTf("Time not (yet) synced!!\n"); return; }
                 inFX  = random(0, ARRAY_SIZE(effect));
                 outFX = random(0, ARRAY_SIZE(effect));
-                snprintf(actMessage, LOCAL_SIZE, weekDayName[weekday()]);
+                snprintf(actMessage, LOCAL_SIZE, weekDayName[localtime(&now)->tm_wday+1]);
+                snprintf(onTickerMessage, 120, "%s", actMessage);
+                DebugT("       ["); Debug(onTickerMessage); Debugln("]");
+                P.displayClear();
                 P.displayText(actMessage, PA_CENTER, (MAX_SPEED - settingTextSpeed), 1000, effect[inFX], effect[outFX]);
                 DebugTf("Animate IN[%d], OUT[%d] %s\r\n", inFX, outFX, actMessage);
                 break;
-      case 2:   if (!(millis() > timeTimer))  return;
+      case 2:   if (!(millis() > timeTimer)) { DebugTln("Not yet time to display the time"); return; }
+                if (!timeSynced)   { DebugTf("Time not (yet) synced!!\n"); return; }
                 timeTimer = millis() + 60000;
                 inFX  = random(0, ARRAY_SIZE(effect));
                 outFX = random(0, ARRAY_SIZE(effect));
                 sprintf(actMessage, "%s", updateTime());
+                snprintf(onTickerMessage, 120, "%s", actMessage);
+                DebugT("       ["); Debug(onTickerMessage); Debugln("]");
                 P.displayText(actMessage, PA_CENTER, (MAX_SPEED - settingTextSpeed), 2000, effect[inFX], effect[outFX]);
                 DebugTf("Animate IN[%d], OUT[%d] %s\r\n", inFX, outFX, actMessage);
                 break;

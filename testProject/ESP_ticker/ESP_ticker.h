@@ -8,10 +8,10 @@
 ***************************************************************************      
 */
 
-//#include <ESP8266WiFi.h>
 #include <LittleFS.h>
 
-//--aaw- #include <ezTime.h>             // https://github.com/ropg/ezTime
+#include "TimeSyncClass.h"
+
 #include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
 #include "Debug.h"
 #include "networkStuff.h"
@@ -48,6 +48,7 @@ char      cMsg[NEWS_SIZE];
 char      tempMessage[LOCAL_SIZE] = "";
 uint8_t   msgType;
 char      actMessage[NEWS_SIZE], timeMsg[20];
+char      onTickerMessage[LOCAL_SIZE] = {};
 char      fileMessage[LOCAL_SIZE];
 uint8_t   newsMsgID   = 0;
 uint8_t   localMsgID  = 0;
@@ -68,8 +69,12 @@ char      settingWeerLiveAUTH[51], settingWeerLiveLocation[51];
 uint8_t   settingWeerLiveInterval;
 char      settingNewsAUTH[51];
 uint8_t   settingNewsInterval, settingNewsMaxMsg;
+time_t    now; 
+struct tm timeinfo;
+bool      timeSynced = false;
 
-Timezone  CET;
+
+TimeSync        timeSync;
 
 const char *weekDayName[]  {  "Unknown", "Zondag", "Maandag", "Dinsdag", "Woensdag"
                             , "Donderdag", "Vrijdag", "Zaterdag", "Unknown" };

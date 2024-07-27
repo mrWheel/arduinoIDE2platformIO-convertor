@@ -46,10 +46,10 @@ void writeLastStatus()
   }
   char buffer[50] = "";
   snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d; %02d:%02d:%02d; %010u; %s;\n"
-                                          , year(), month(), day()
-                                          , hour(), minute(), second()
-                                          , nrReboots
-                                          , "meta data");
+           , localtime(&now)->tm_year+1900, localtime(&now)->tm_mon+1, localtime(&now)->tm_mday
+           , localtime(&now)->tm_hour, localtime(&now)->tm_min, localtime(&now)->tm_sec
+           , nrReboots
+           , "meta data");
   DebugTf("writeLastStatus() => %s\r\n", buffer);
 
   File _file = LittleFS.open("/sysStatus.csv", "w");
@@ -183,9 +183,9 @@ void writeToLog(const char *logLine)
   }
   char buffer[150] = "";
   snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d; %02d:%02d:%02d; %s;\n"
-                                          , year(), month(), day()
-                                          , hour(), minute(), second()
-                                          , logLine);
+           , localtime(&now)->tm_year+1900, localtime(&now)->tm_mon+1, localtime(&now)->tm_mday
+           , localtime(&now)->tm_hour, localtime(&now)->tm_min, localtime(&now)->tm_sec
+           , logLine);
   DebugTf("writeToLogs() => %s\r\n", buffer);
   File _file = LittleFS.open("/sysLog.csv", "a");
   if (!_file)
