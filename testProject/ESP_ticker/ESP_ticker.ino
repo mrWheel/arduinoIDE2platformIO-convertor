@@ -52,43 +52,6 @@
 #define _HOSTNAME   "ESPticker"
 #include "ESP_ticker.h"
 
-// HARDWARE SPI
-MD_Parola P = MD_Parola(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
-
-// WiFi Server object and parameters
-WiFiServer server(80);
-
-// Scrolling parameters
-
-uint8_t  inFX, outFX;
-textEffect_t  effect[] =
-  {
-    PA_PRINT,
-  //PA_SCAN_HORIZ,
-    PA_SCROLL_LEFT,
-    PA_WIPE,
-    PA_SCROLL_UP_LEFT,
-    PA_SCROLL_UP,
-    PA_OPENING_CURSOR,
-    PA_GROW_UP,
-    PA_MESH,
-    PA_SCROLL_UP_RIGHT,
-  //PA_BLINDS,
-    PA_CLOSING,
-    PA_RANDOM,
-    PA_GROW_DOWN,
-    PA_SCAN_VERT,
-    PA_SCROLL_DOWN_LEFT,
-    PA_WIPE_CURSOR,
-  //PA_DISSOLVE,
-    PA_OPENING,
-    PA_CLOSING_CURSOR,
-    PA_SCROLL_DOWN_RIGHT,
-    PA_SCROLL_RIGHT,
-  //PA_SLICE,
-    PA_SCROLL_DOWN,
-  };
-
 
 //---------------------------------------------------------------------
 int16_t calculateIntensity()
@@ -267,8 +230,6 @@ void setup()
   while(!Serial) { /* wait a bit */ }
 
   lastReset     = ESP.getResetReason();
-
-  startTelnet();
   
   DebugTln("\r\n[MD_Parola WiFi Message Display]\r\n");
   DebugTf("Booting....[%s]\r\n\r\n", String(_FW_VERSION).c_str());
@@ -442,13 +403,13 @@ void loop()
   
   if ((millis() > weerTimer) && (strlen(settingWeerLiveAUTH) > 5))
   {
-    weerTimer = millis() + (settingWeerLiveInterval * (60 * 1000)); // Interval in Minutes!
+    weerTimer = millis() + (settingWeerLiveInterval * (300 * 1000)); // Interval in Minutes!
     if (settingWeerLiveInterval > 0)  getWeerLiveData();
   }
 
   if ((millis() > newsapiTimer) && (strlen(settingNewsAUTH) > 5))
   {
-    newsapiTimer = millis() + (settingNewsInterval * (60 * 1000)); // Interval in Minutes!
+    newsapiTimer = millis() + (settingNewsInterval * (300 * 1000)); // Interval in Minutes!
     if (settingNewsInterval > 0) 
     {
       if (!getNewsapiData())  //-- first try ...

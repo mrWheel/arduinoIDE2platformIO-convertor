@@ -8,15 +8,17 @@
 ***************************************************************************      
 */
 
+#include <FS.h>
 #include <LittleFS.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
 
 #include "TimeSyncClass.h"
 
-#include <TelnetStream.h>       // https://github.com/jandrassy/TelnetStream/commit/1294a9ee5cc9b1f7e51005091e351d60c8cddecf
 #include "Debug.h"
-#include "networkStuff.h"
+//aaw#include "networkStuff.h"
 
-#include <MD_Parola.h>
+#include <MD_Parola.h>          // @ 3.7.3 (was 3.5.5)
 #include <MD_MAX72xx.h>
 #include "parola_Fonts_data.h"
 #include <SPI.h>
@@ -39,6 +41,47 @@
 #define NEWS_SIZE       512
 #define JSON_BUFF_MAX   255
 #define MAX_NO_NO_WORDS  20
+
+
+// HARDWARE SPI
+MD_Parola P = MD_Parola(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
+
+// WiFi Server object and parameters
+ESP8266WebServer httpServer(80);
+
+#include <ESP8266mDNS.h>        // part of ESP8266 Core https://github.com/esp8266/Arduino
+
+// Scrolling parameters
+
+uint8_t  inFX, outFX;
+textEffect_t  effect[] =
+{
+  PA_PRINT,
+  //PA_SCAN_HORIZ,
+  PA_SCROLL_LEFT,
+  PA_WIPE,
+  PA_SCROLL_UP_LEFT,
+  PA_SCROLL_UP,
+  PA_OPENING_CURSOR,
+  PA_GROW_UP,
+  PA_MESH,
+  PA_SCROLL_UP_RIGHT,
+  //PA_BLINDS,
+  PA_CLOSING,
+  PA_RANDOM,
+  PA_GROW_DOWN,
+  PA_SCAN_VERT,
+  PA_SCROLL_DOWN_LEFT,
+  PA_WIPE_CURSOR,
+  //PA_DISSOLVE,
+  PA_OPENING,
+  PA_CLOSING_CURSOR,
+  PA_SCROLL_DOWN_RIGHT,
+  PA_SCROLL_RIGHT,
+  //PA_SLICE,
+  PA_SCROLL_DOWN,
+};
+
 
 bool      Verbose = false;
 char      cDate[15], cTime[10];
@@ -69,6 +112,8 @@ char      settingWeerLiveAUTH[51], settingWeerLiveLocation[51];
 uint8_t   settingWeerLiveInterval;
 char      settingNewsAUTH[51];
 uint8_t   settingNewsInterval, settingNewsMaxMsg;
+bool      LittleFSmounted = false;
+FSInfo    LittleFSinfo;
 time_t    now; 
 struct tm timeinfo;
 bool      timeSynced = false;

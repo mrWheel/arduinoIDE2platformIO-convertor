@@ -469,7 +469,11 @@ def create_header_files(pio_src, pio_include, project_name):
     logging.info("Processed regular header files")
 
 #------------------------------------------------------------------------------------------------------
-def fix_header_file(header_path, project_name, original_header_content):
+def fix_header_file(header_path, project_name):
+    # Read the original content
+    with open(header_path, 'r') as f:
+        original_content = f.read()
+
     # Determine the corresponding .cpp or .ino file
     src_dir = os.path.join(os.path.dirname(os.path.dirname(header_path)), 'src')
     base_name = os.path.splitext(os.path.basename(header_path))[0]
@@ -484,58 +488,44 @@ def fix_header_file(header_path, project_name, original_header_content):
         with open(source_file_path, 'r') as f:
             file_content = f.read()
         prototypes = extract_prototypes(file_content, source_file)
-        # Filter out setup() and loop()
-        prototypes = [p for p in prototypes if not p.startswith(('void setup', 'void loop'))]
         logging.info(f"Extracted {len(prototypes)} prototypes from {source_file}")
         for proto in prototypes:
             logging.info(f"  Prototype: {proto}")
     else:
         logging.warning(f"Source file {source_file} not found for {header_path}")
 
-    # If original_header_content is None, read the content from the file
-    if original_header_content is None:
-        try:
-            with open(header_path, 'r') as f:
-                original_header_content = f.read()
-        except FileNotFoundError:
-            logging.error(f"Header file not found: {header_path}")
-            return
-        except IOError as e:
-            logging.error(f"Error reading header file {header_path}: {str(e)}")
-            return
-
-    # Prepare the new prototype section
-    new_prototype_section = f"{prototypes_marker}\n"
-    for prototype in prototypes:
-        new_prototype_section += f"{prototype}\n"
-    new_prototype_section += "\n"
-
-    # Find the position to insert or replace prototypes in the original content
-    prototype_start = original_header_content.find(prototypes_marker)
-    if prototype_start != -1:
+    # Find the position to insert prototypes
+    prototype_marker_pos = original_content.find(prototypes_marker)
+    if prototype_marker_pos != -1:
         # If marker exists, find the end of the prototype section
-        prototype_end = original_header_content.find('\n\n', prototype_start)
-        if prototype_end == -1:
-            prototype_end = len(original_header_content)
+        end_pos = original_content.find('\n\n', prototype_marker_pos)
+        if end_pos == -1:
+            end_pos = len(original_content)
+        
+        # Prepare the new prototype section
+        new_prototype_section = f"{prototypes_marker}\n"
+        for prototype in prototypes:
+            new_prototype_section += f"{prototype}\n"
         
         # Replace the old prototype section with the new one
-        new_content = (original_header_content[:prototype_start] + 
+        new_content = (original_content[:prototype_marker_pos] + 
                        new_prototype_section + 
-                       original_header_content[prototype_end:])
+                       original_content[end_pos:])
     else:
         # If marker doesn't exist, insert prototypes after includes
-        include_pos = original_header_content.rfind('#include')
+        include_pos = original_content.rfind('#include')
         if include_pos != -1:
-            insert_pos = original_header_content.find('\n', include_pos) + 1
+            insert_pos = original_content.find('\n', include_pos) + 1
         else:
             insert_pos = 0
         
-        new_content = (original_header_content[:insert_pos] + 
-                       "\n" + new_prototype_section + 
-                       original_header_content[insert_pos:])
-
-    # Compress multiple empty lines to a single empty line
-    new_content = re.sub(r'\n\s*\n', '\n\n', new_content)
+        new_prototype_section = f"\n{prototypes_marker}\n"
+        for prototype in prototypes:
+            new_prototype_section += f"{prototype}\n"
+        
+        new_content = (original_content[:insert_pos] + 
+                       new_prototype_section + 
+                       original_content[insert_pos:])
 
     # Write the updated content back to the file
     with open(header_path, 'w') as f:
@@ -548,18 +538,13 @@ def fix_header_file(header_path, project_name, original_header_content):
     logging.info("Prototypes added:")
     for proto in prototypes:
         logging.info(f"  {proto}")
-        
+
 #------------------------------------------------------------------------------------------------------
 def process_header_files(pio_include, project_name):
     for file in os.listdir(pio_include):
         if file.endswith('.h'):
             header_path = os.path.join(pio_include, file)
-            if file == f"{project_name}.h":
-                original_content = preserve_original_header(pio_include, project_name)
-            else:
-                with open(header_path, 'r') as f:
-                    original_content = f.read()
-            fix_header_file(header_path, project_name, original_content)
+            fix_header_file(header_path, project_name)
 
 
 #------------------------------------------------------------------------------------------------------
@@ -986,11 +971,7 @@ def add_extern_declarations(header_path, new_declarations):
             logging.info(f"No new extern declarations added to [{short_header_path}]")
 
 #------------------------------------------------------------------------------------------------------
-def update_header_with_externs(pio_include, global_vars, class_instances, used_vars_by_file, project_name):
-    main_header = f"{project_name}.h"
-    main_header_content = preserve_original_header(pio_include, main_header)
-    main_header_vars = set(re.findall(r'\b(\w+)\s*(?:=|;)', main_header_content))
-
+def update_header_with_externs(pio_include, global_vars, class_instances, used_vars_by_file):
     for file, used_vars in used_vars_by_file.items():
         header_path = os.path.join(pio_include, f"{os.path.splitext(file)[0]}.h")
         new_extern_declarations = set()
@@ -999,9 +980,6 @@ def update_header_with_externs(pio_include, global_vars, class_instances, used_v
         for defining_file, vars_in_file in global_vars.items():
             for var_type, var_name, _ in vars_in_file:
                 if var_name in used_vars and defining_file != file:
-                    # Skip adding extern for variables already declared in main header
-                    if file == main_header and var_name in main_header_vars:
-                        continue
                     extern_decl = f"extern {var_type} {var_name};"
                     new_extern_declarations.add(extern_decl)
                     
@@ -1014,9 +992,6 @@ def update_header_with_externs(pio_include, global_vars, class_instances, used_v
         for defining_file, instances in class_instances.items():
             for class_type, instance_name, _, _ in instances:
                 if instance_name in used_vars and defining_file != file:
-                    # Skip adding extern for instances already declared in main header
-                    if file == main_header and instance_name in main_header_vars:
-                        continue
                     extern_decl = f"extern {class_type} {instance_name};"
                     new_extern_declarations.add(extern_decl)
                     
@@ -1026,49 +1001,53 @@ def update_header_with_externs(pio_include, global_vars, class_instances, used_v
                         new_includes.add(f'#include "{defining_header}"')
 
         if new_extern_declarations or new_includes:
-            update_header_file(header_path, new_extern_declarations, new_includes, file == main_header)
+            update_header_file(header_path, new_extern_declarations, new_includes)
 
     logging.info(f"Processed extern declarations for all files")
 
-
 #------------------------------------------------------------------------------------------------------
-def update_header_file(header_path, new_extern_declarations, new_includes, is_main_header):
+def update_header_file(header_path, new_extern_declarations, new_includes):
+
+    marker_index = header_path.find(platformio_marker)
+    if marker_index != -1:
+        short_header_path = header_path[marker_index + len(platformio_marker):]
+    else:
+        short_header_path = header_path
+
     with open(header_path, 'r+') as f:
         content = f.read()
         
-        if is_main_header:
-            # For main header, only add new includes
-            if new_includes:
-                include_pos = content.find(f"{localheaders_marker}")
-                if include_pos != -1:
-                    include_pos += len(f"{localheaders_marker}\n")
-                    content = content[:include_pos] + '\n'.join(new_includes) + '\n' + content[include_pos:]
-        else:
-            # For other headers, add both includes and extern declarations
-            if new_includes:
-                include_pos = content.find(f"{localheaders_marker}")
-                if include_pos != -1:
-                    include_pos += len(f"{localheaders_marker}\n")
-                    content = content[:include_pos] + '\n'.join(new_includes) + '\n' + content[include_pos:]
-            
-            if new_extern_declarations:
-                extern_pos = content.find(f"{externvariables_marker}")
-                if extern_pos != -1:
-                    extern_pos += len(f"{externvariables_marker}\n")
-                    content = content[:extern_pos] + '\n'.join(new_extern_declarations) + '\n' + content[extern_pos:]
+        # Add new includes
+        if new_includes:
+            #include_pos = content.find("//== Local Headers ==")
+            include_pos = content.find(f"{localheaders_marker}")
+            if include_pos != -1:
+                #include_pos += len("//== Local Headers ==\n")
+                include_pos += len(f"{localheaders_marker}\n")
+                content = content[:include_pos] + '\n'.join(new_includes) + '\n' + content[include_pos:]
+        
+        # Add new extern declarations
+        #extern_pos = content.find("//== Extern Variables ==")
+        extern_pos = content.find(f"{externvariables_marker}")
+        if extern_pos != -1:
+            #extern_pos += len("//== Extern Variables ==\n")
+            extern_pos += len(f"{externvariables_marker}\n")
+            content = content[:extern_pos] + '\n'.join(new_extern_declarations) + '\n' + content[extern_pos:]
         
         f.seek(0)
         f.write(content)
         f.truncate()
 
-    logging.info(f"Updated header file: {os.path.basename(header_path)}")
+    logging.info(f"Updated header file: {short_header_path}")
     if new_includes:
         for include in new_includes:
-            logging.info(f">> Added include: {include}")
-    if new_extern_declarations and not is_main_header:
+          logging.info(f">> Added include: {include}")
+
+    if new_extern_declarations:
+        #logging.info(f"Added extern declarations: {'>> '.join(new_extern_declarations)}")
         for declaration in new_extern_declarations:
-            logging.info(f">> Added declaration: {declaration}")
-            
+          logging.info(f">> added declaration: {declaration}")
+
 #------------------------------------------------------------------------------------------------------
 def update_header_with_prototypes(header_path, prototypes):
     """Update header file with function prototypes."""
@@ -1342,32 +1321,17 @@ def process_ino_files(pio_src, pio_include, project_name, global_vars, class_ins
         os.remove(source_path)
 
     # Now that we have processed all files and collected used_vars_by_file, we can update headers with externs
-    update_header_with_externs(pio_include, global_vars, class_instances, used_vars_by_file, project_name)
+    update_header_with_externs(pio_include, global_vars, class_instances, used_vars_by_file)
 
     logging.info("Processed .ino files: renamed, updated headers, and converted to .cpp")
 
 
 #------------------------------------------------------------------------------------------------------
-def preserve_original_headers(pio_include):
-    """Read and preserve the original content of all existing header files."""
-    original_headers = {}
-    for file in os.listdir(pio_include):
-        if file.endswith('.h'):
-            header_path = os.path.join(pio_include, file)
-            with open(header_path, 'r') as f:
-                original_headers[file] = f.read()
-
-    return original_headers
-
-#------------------------------------------------------------------------------------------------------
-def preserve_original_header(pio_include, file_name):
-    """Read and preserve the original content of a specific header file."""
-    header_path = os.path.join(pio_include, file_name)
-    if os.path.exists(header_path):
-        with open(header_path, 'r') as f:
-            return f.read()
-        
-    return None
+def preserve_original_header(pio_include, project_name):
+    """Read and preserve the original content of the project header file."""
+    project_header_path = os.path.join(pio_include, f"{project_name}.h")
+    with open(project_header_path, 'r') as f:
+        return f.read()
 
 #------------------------------------------------------------------------------------------------------
 def update_project_header(pio_include, project_name, original_content):
@@ -1465,24 +1429,24 @@ def main():
 
         marker_index = pio_folder.find(marker)
         if marker_index != -1:
-            part_of_path = pio_folder[marker_index + len(marker):]
-            logging.info(f"PlatformIO folder: {part_of_path}")
+          part_of_path = pio_folder[marker_index + len(marker):]
+          logging.info(f"PlatformIO folder: {part_of_path}")
         else:
-            logging.info(f"PlatformIO folder: {pio_folder}")
+          logging.info(f"PlatformIO folder: {pio_folder}")
 
         marker_index = pio_src.find(marker)
         if marker_index != -1:
-            part_of_path = pio_src[marker_index + len(marker):]
-            logging.info(f"PlatformIO src folder: {part_of_path}")
+          part_of_path = pio_src[marker_index + len(marker):]
+          logging.info(f"PlatformIO src folder: {part_of_path}")
         else:
-            logging.info(f"PlatformIO src folder: {pio_src}")
+          logging.info(f"PlatformIO src folder: {pio_src}")
   
         marker_index = pio_include.find(marker)
         if marker_index != -1:
-            part_of_path = pio_include[marker_index + len(marker):]
-            logging.info(f"PlatformIO include folder: {part_of_path}")
+          part_of_path = pio_include[marker_index + len(marker):]
+          logging.info(f"PlatformIO include folder: {part_of_path}")
         else: 
-            logging.info(f"PlatformIO include folder: {pio_include}\n")
+          logging.info(f"PlatformIO include folder: {pio_include}\n")
 
         recreate_pio_folders(pio_folder, pio_src, pio_include)
 
@@ -1496,30 +1460,28 @@ def main():
         extract_and_comment_defines(pio_folder, pio_include)
         create_header_files(pio_src, pio_include, project_name)
 
-        original_headers = preserve_original_headers(pio_include)
+        original_header_content = preserve_original_header(pio_include, project_name)
 
         logging.info("Extracting global variables:")
         global_vars, used_vars_by_file = extract_global_vars(pio_src, pio_include, project_name)
 
         class_instances = extract_class_instances(pio_src, pio_include, project_name)
         if len(class_instances) == 0:
-            logging.info(f"No class instances extracted")
+          logging.info(f"No class instances extracted")
         else:
-            logging.info(f"Extracted class instances:")
-            for file, instances in class_instances.items():
-                for class_type, instance_name, _, _ in instances:
-                    logging.info(f">> {file}: {class_type} {instance_name}")
+          logging.info(f"Extracted class instances:")
+          for file, instances in class_instances.items():
+              for class_type, instance_name, _, _ in instances:
+                  logging.info(f">> {file}: {class_type} {instance_name}")
 
         process_ino_files(pio_src, pio_include, project_name, global_vars, class_instances)
-
-        # Update headers with externs, passing the project_name
-        update_header_with_externs(pio_include, global_vars, class_instances, used_vars_by_file, project_name)
 
         function_reference_array = process_function_references(pio_src, pio_include)
 
         find_undefined_functions_and_update_headers(pio_src, pio_include, function_reference_array)
 
         main_header_path = os.path.join(pio_include, f"{project_name}.h")
+        #fix_main_header_file(main_header_path, project_name, original_header_content)
         process_header_files(pio_include, project_name)
 
         logging.info("Arduino to PlatformIO conversion completed successfully")
@@ -1532,3 +1494,4 @@ def main():
 #======================================================================================================
 if __name__ == "__main__":
     main()
+  

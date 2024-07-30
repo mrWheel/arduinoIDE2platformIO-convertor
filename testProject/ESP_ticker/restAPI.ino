@@ -8,6 +8,9 @@
 ***************************************************************************      
 */
 
+#include <FS.h>
+#include <LittleFS.h>
+
 //=======================================================================
 void processAPI() 
 {
@@ -98,6 +101,8 @@ void processAPI()
 //=======================================================================
 void sendDeviceInfo() 
 {
+  FSInfo LittleFSinfo;
+  
   sendStartJsonObj("devinfo");
 
   sendNestedJsonObj("author", "Willem Aandewiel (www.aandewiel.nl)");
