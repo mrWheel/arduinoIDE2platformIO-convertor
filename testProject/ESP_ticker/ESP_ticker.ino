@@ -2,7 +2,8 @@
 ***************************************************************************  
 **  Program  : ESP_ticker (lichtkrant)
 */
-#define _FW_VERSION "v1.7.3 (04-05-2023)"
+//#define FWversion "v1.7.3 (04-05-2023)"
+const char *FWversion = "v1.7.3 (04-05-2023)";
 /* 
 **  Copyright (c) 2021 .. 2023 Willem Aandewiel
 **
@@ -232,7 +233,7 @@ void setup()
   lastReset     = ESP.getResetReason();
   
   DebugTln("\r\n[MD_Parola WiFi Message Display]\r\n");
-  DebugTf("Booting....[%s]\r\n\r\n", String(_FW_VERSION).c_str());
+  DebugTf("Booting....[%s]\r\n\r\n", String(FWversion).c_str());
   
   P.begin();
   P.displayClear();
@@ -265,13 +266,13 @@ void setup()
       if (!LittleFS.exists("/newsFiles/LCL-000"))
       {
         char LCL000[100];
-        sprintf(LCL000, "ESP_ticker %s by Willem Aandewiel", String(_FW_VERSION).c_str());
+        sprintf(LCL000, "ESP_ticker %s by Willem Aandewiel", String(FWversion).c_str());
         writeFileById("LCL", 0, LCL000);
       }
       if (!LittleFS.exists("/newsFiles/LCL-001"))
       {
         char LCL001[100];
-        sprintf(LCL001, "ESP_ticker %s by Willem Aandewiel", String(_FW_VERSION).c_str());
+        sprintf(LCL001, "ESP_ticker %s by Willem Aandewiel", String(FWversion).c_str());
         writeFileById("LCL", 1, LCL001);
       }
       writeFileById("NWS", 1, "(c) 2021 Willem Aandewiel");

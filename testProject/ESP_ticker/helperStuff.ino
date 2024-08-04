@@ -506,7 +506,7 @@ void getRevisionData()
   if (!LittleFS.exists("/newsFiles/LCL-000"))
   {
     char LCL000[100];
-    sprintf(LCL000, "ESP_ticker %s (c) by Willem Aandewiel", String(_FW_VERSION).c_str());
+    sprintf(LCL000, "ESP_ticker %s (c) by Willem Aandewiel", String(FWversion).c_str());
     writeFileById("LCL", 0, LCL000);
   }
 
