@@ -6,7 +6,7 @@
 #
 #   by        : Willem Aandewiel
 #
-#   Version   : v0.7 (04-08-2024)
+#   Version   : v0.7 (06-08-2024)
 #
 #------------------------------------------------------------
 import os
@@ -154,56 +154,56 @@ def short_path(directory_path):
         return f"{directory_path}"
     
 #------------------------------------------------------------------------------------------------------
-def sort_global_vars(global_vars):
-    """
-    Sort global variables dictionary by file path and then by variable name.
-
-    Args:
-    global_vars (dict): Dictionary of global variables, where keys are file paths
-                        and values are lists of tuples (var_type, var_name)
-
-    Returns:
-    OrderedDict: Sorted dictionary with file paths as keys and sorted lists of tuples as values.
-    """
-    # Sort the dictionary keys (file paths)
-    sorted_file_paths = sorted(global_vars.keys())
-
-    sorted_global_vars = OrderedDict()
-    for file_path in sorted_file_paths:
-        vars_list = global_vars[file_path]
-        # Sort the variables by var_name within each file
-        sorted_vars_list = sorted(vars_list, key=lambda x: x[1])
-        sorted_global_vars[file_path] = sorted_vars_list
-
-    return sorted_global_vars
-
-#------------------------------------------------------------------------------------------------------
 def print_global_vars(global_vars):
     """
     Print global variables line by line, grouped by file.
 
     Args:
     global_vars (dict): Dictionary of global variables, where keys are file paths
-                        and values are lists of tuples (var_type, var_name)
+                        and values are lists of tuples (var_type, var_name, function, is_pointer)
     """
-    global args
-    if not args.debug:
-        return
-    
     if not any(vars_list for vars_list in global_vars.values()):
         return
+    try:
+        sorted_global_vars = sort_global_vars(global_vars)
 
-    sorted_global_vars = sort_global_vars(global_vars)
+        if (len(sorted_global_vars) > 0):
+            print("--- Global Variables ---")
+        for file_path, vars_list in sorted_global_vars.items():
+            if vars_list:  # Only print for files that have global variables
+                #print(f"\nFile: {file_path}")
+                for var_type, var_name, function, is_pointer in vars_list:
+                    pointer_str = "*" if is_pointer else " "
+                    function_str = function if function else "global scope"
+                    var_type_pointer = f"{var_type}{pointer_str}"
+                    #print(f"       {var_type:<15} {pointer_str:<1} {var_name:<35} {function_str:<20} (in {file_path})")
+                    print(f"       {var_type_pointer:<15} {var_name:<35} {function_str:<20} (in {file_path})")
+        
+        print("")
 
-    if (len(sorted_global_vars) > 0):
-        print("--- Global Variables ---")
-    for file_path, vars_list in sorted_global_vars.items():
-        if vars_list:  # Only print for files that have global variables
-            #print(f"\nFile: {file_path}")
-            for var_type, var_name, function in vars_list:
-                print("       {:<15} {:<35} (in {:})".format(var_type, var_name, file_path))
-    
-    print("")
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        line_number = exc_tb.tb_lineno
+        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
+        exit()
+
+#------------------------------------------------------------------------------------------------------
+def sort_global_vars(global_vars):
+    """
+    Sort the global variables dictionary by file path and variable name.
+
+    Args:
+    global_vars (dict): Dictionary of global variables, where keys are file paths
+                        and values are lists of tuples (var_type, var_name, function, is_pointer)
+
+    Returns:
+    OrderedDict: Sorted dictionary of global variables
+    """
+    sorted_dict = OrderedDict()
+    for file_path in sorted(global_vars.keys()):
+        sorted_dict[file_path] = sorted(global_vars[file_path], key=lambda x: x[1])  # Sort by var_name
+    return sorted_dict
+
 
 #------------------------------------------------------------------------------------------------------
 def print_global_vars_undefined(global_vars_undefined):
@@ -213,14 +213,19 @@ def print_global_vars_undefined(global_vars_undefined):
     Args:
     global_vars_undefined (dict): Dictionary of global variables used in functions
     """
-    global args
-    if not args.debug:
-        return
+    try:
+        if (len(global_vars_undefined) > 0):
+            print("\n--- Undefined Global Variables ---")
+        for key, info in sorted(global_vars_undefined.items(), key=lambda x: (x[1]['var_name'], x[1]['used_in'], x[1]['line'])):
+            pointer_str = "*" if info['var_is_pointer'] else ""
+            var_type_pointer = f"{info['var_type']}{pointer_str}"
+            print(f"  - {var_type_pointer:<15.15} {info['var_name']:<30} (line {info['line']:<4}  in {info['used_in'][:20]:<20}) [{var_type_pointer:<25.25}] (defined in {info['defined_in']})")
 
-    if (len(global_vars_undefined) > 0):
-        print("\n--- Undefined Global Variables ---")
-    for var, info in sorted(global_vars_undefined.items(), key=lambda x: x[1]['line']):
-        print(f"  - {var[:20]:<20} (line {info['line']:<4}- {info['function'][:20]:<20} in {info['used_in'][:20]:<20}) [{f"{info['var_type']} {info['var_name']}":<25.25}] (defined in {info['defined_in']})")
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        line_number = exc_tb.tb_lineno
+        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
+        exit()
 
 #------------------------------------------------------------------------------------------------------
 def print_functions(functions_dict):
@@ -230,10 +235,6 @@ def print_functions(functions_dict):
     Args:
     functions_dict (dict): Dictionary of function prototypes, with function names as keys and tuples (prototype, file_path) as values.
     """
-    global args
-    if not args.debug:
-        return
-
     try:
       if not functions_dict:
           logging.info("\tNo functions found.")
@@ -255,10 +256,6 @@ def print_functions(functions_dict):
 #------------------------------------------------------------------------------------------------------
 def print_class_instances(class_instances):
     """Print the dictionary of class instances."""
-    global args
-    if not args.debug:
-        return
-
     try:
         if not any(vars_list for vars_list in class_instances.values()):
             return
@@ -268,7 +265,6 @@ def print_class_instances(class_instances):
             if class_list:  # Only print for files that have classes
                 for class_type, instance_name, constructor_args, fbase in class_list:
                     parentacedConstructor = "("+constructor_args+")"
-                    #print(f"       {:<15} {:<20} ({:<35}) (in {:})".format(class_type, instance_name, constructor_args, fbase))
                     print(f"       {class_type:<15} {instance_name:<20} {parentacedConstructor:<35} (in {fbase})")
         
         print("")
@@ -540,7 +536,7 @@ def copy_data_folder():
 def create_platformio_ini():
     """Create a platformio.ini file if it doesn't exist."""
     logging.info("")
-    logging.info(f"Create [platformio.ini] file if it doesn't exist in [{short_path(glob_pio_project_folder)}]")
+    logging.info(f"Processing create _platformio_ini() if it doesn't exist in [{short_path(glob_pio_project_folder)}]")
     platformio_ini_path = os.path.join(glob_pio_project_folder, 'platformio.ini')
     if not os.path.exists(platformio_ini_path):
         platformio_ini_content = """
@@ -716,7 +712,7 @@ def extract_and_comment_defines():
 def create_new_header_file(ino_name, header_name):
     """Create new header file with basic structure."""
     logging.info("")
-    logging.info(f"Create new header file: {header_name} for [{ino_name}]")
+    logging.info(f"Processing create_new_header_file(): {header_name} for [{ino_name}]")
 
     header_path = os.path.join(glob_pio_include, f"{header_name}")
 
@@ -744,70 +740,50 @@ def create_new_header_file(ino_name, header_name):
 
 #------------------------------------------------------------------------------------------------------
 def process_original_header_file(header_path, base_name):
-    
-    logging.info(f"Processing original header file: [{base_name}]")
+    logging.info(f"Processing process_original_header_file(): [{base_name}]")
     
     if os.path.exists(header_path):
         with open(header_path, 'r') as f:
-            content = f.read()
+            original_content = f.read()
+        
         # Check for existing header guards
-        has_guards = re.search(r'#ifndef\s+\w+_H.*?#define\s+\w+_H', content, re.DOTALL) is not None
+        has_guards = re.search(r'#ifndef\s+\w+_H.*?#define\s+\w+_H', original_content, re.DOTALL) is not None
+
+        prefix = ""
+        suffix = ""
 
         if not has_guards:
-            # Add header guards if they don't exist
-            content = f"#ifndef {base_name.upper()}_H\n#define {base_name.upper()}_H\n\n{content}\n#endif // {base_name.upper()}_H\n"
+            # Prepare header guards if they don't exist
+            logging.info(f"\tPreparing header guards for {base_name}")
+            guard_name = f"{base_name.upper()}_H"
+            prefix = f"#ifndef {guard_name}\n#define {guard_name}\n\n"
+            suffix = f"\n#endif // {guard_name}\n"
         
         # Check if allDefines.h is already included
-        if '#include "allDefines.h"' not in content:
-            # Add the include after Arduino.h if it exists, otherwise at the start of the guard
-            if '#include <Arduino.h>' in content:
-                content = content.replace('#include <Arduino.h>', '#include <Arduino.h>\n#include "allDefines.h"')
-            else:
-                insert_pos = content.find('\n', content.find('#define')) + 1
-                content = content[:insert_pos] + '#include "allDefines.h"\n\n' + content[insert_pos:]
+        if '#include "allDefines.h"' not in original_content:
+            # Prepare the include statement
+            logging.info(f"\tPreparing to add allDefines.h include to {base_name}")
+            prefix += '#include "allDefines.h"\n\n'
+
+        # Combine original content with additions
+        if prefix or suffix:
+            new_content = prefix + original_content + suffix
+            
+            # Only write to the file if changes were made
+            with open(header_path, 'w') as f:
+                f.write(new_content)
+            logging.info(f"\tUpdated original header file: {short_path(header_path)}")
+        else:
+            logging.info(f"\tNo changes needed for: {short_path(header_path)}")
     else:
-        # Create new file with header guards
-        content = f"#ifndef {base_name.upper()}_H\n#define {base_name.upper()}_H\n\n#include <Arduino.h>\n#include \"allDefines.h\"\n\n#endif // {base_name.upper()}_H\n"
+        logging.info(f"\tFile not found: {short_path(header_path)}")
 
-    # Extract sections
-    guard_start = re.search(r'#ifndef\s+\w+_H.*?#define\s+\w+_H', content, re.DOTALL)
-    guard_end = content.rfind('#endif')
-
-    if guard_start and guard_end != -1:
-        header = content[:guard_start.end()]
-        body = content[guard_start.end():guard_end]
-        footer = content[guard_end:]
-    else:
-        return  # If we can't find guards, don't modify the file
-
-    # Process body
-    includes = re.findall(r'#include.*', body)
-    #local_headers = re.findall(r'//== Local Headers ==.*?(?=//==|$)', body, re.DOTALL)
-    local_headers = re.findall(r'{localheaders_marker}.*?(?=//==|$)', body, re.DOTALL)
-    externs = re.findall(r'extern.*?;', body, re.DOTALL)
-    prototypes = re.findall(r'^\w+[\s\*]+\w+\s*\([^)]*\);', body, re.MULTILINE)
-
-    # Remove processed items from body
-    for item in includes + local_headers + externs + prototypes:
-        body = body.replace(item, '')
-
-    # Reconstruct file
-    new_content = header + '\n'
-
-    if includes:
-        new_content += '\n'.join(includes) + '\n\n'
-
-    new_content += body.strip() + '\n' + footer
-
-    with open(header_path, 'w') as f:
-        f.write(new_content)
-
-    logging.info(f"\tProcessed original header file: {short_path(header_path)}")
+    return header_path
 
 #------------------------------------------------------------------------------------------------------
 def insert_external_variables(base_name):
     logging.info("")
-    logging.info(f"insert external variables in file: [{os.path.splitext(base_name)[0]}]")
+    logging.info(f"Processing insert_external_variables() in file: [{os.path.splitext(base_name)[0]}]")
     
     # Get the full path of the file under test
     base_used_in  = os.path.splitext(base_name)[0]
@@ -818,12 +794,13 @@ def insert_external_variables(base_name):
         # Select undefined variables used in the file under test
         selected_vars = []
         for var_name, info in dict_undefined_vars_used.items():
-            #logging.info(f"\tprocessing: [{info['var_type']}\t {var_name}]\t (Used in {info['used_in']}), \tDefined in [{info['defined_in']}]")
+            #logging.info(f"\tChecking: [{info['var_type']:<10}\t {var_name:<30}]\t (Used in {info['used_in']}), \tDefined in [{info['defined_in']}]")
             if info['used_in'] == base_used_in and info['defined_in'] != base_used_in:
-                logging.info(f"\tfound: {info['var_type']:<10} \t{var_name:<30} (defined in {info['defined_in']})")
+                logging.info(f"\tfound: {info['var_type']:<10} \t{info['var_name']:<30} (defined in {info['defined_in']})")
+                var_name_base = info['var_name']
                 var_type = info['var_type']
                 defined_in = info['defined_in']
-                selected_vars.append((var_type, var_name, defined_in))
+                selected_vars.append((var_type, var_name_base, defined_in))
         
         if not selected_vars:
             logging.info(f"\tNo undefined variables found for {base_name}")
@@ -846,7 +823,7 @@ def insert_external_variables(base_name):
         
         # Insert the external variable declarations after the marker
         insert_pos = marker_pos + len(marker) + 1  # +1 for the newline
-        extern_vars_text = "\n".join(f"extern {var_type:<10} {var_name+';':<30} \t//-- from {defined_in}" for var_type, var_name, defined_in in selected_vars) + "\n"
+        extern_vars_text = "\n".join(f"extern {var_type:<10} {var_name_base+';':<30} \t//-- from {defined_in}" for var_type, var_name_base, defined_in in selected_vars) + "\n"
         
         new_content = (
             file_content[:insert_pos] +
@@ -870,7 +847,7 @@ def insert_external_variables(base_name):
 #------------------------------------------------------------------------------------------------------
 def insert_prototypes(base_name):
     logging.info("")
-    logging.info(f"insert prototypes in file: [{base_name}]")
+    logging.info(f"Processing insert_prototypes() in file: [{base_name}]")
     
     # Get the full path of the file under test
     header_name = os.path.splitext(base_name)[0] + ".h"
@@ -924,11 +901,10 @@ def insert_prototypes(base_name):
 
 #------------------------------------------------------------------------------------------------------
 def insert_local_includes(base_name):
-    
     global args
 
     logging.info("")
-    logging.info(f"Processing insert local includes for file: [{base_name}]")
+    logging.info(f"Processing insert_local_includes() for file: [{base_name}]")
     
     # Get the full path of the file under test and its header
     src_file_path = os.path.join(glob_pio_src, base_name)
@@ -957,6 +933,13 @@ def insert_local_includes(base_name):
             # Print local functions (both defined and called)
             print(f"Local functions (defined and called): {', '.join(sorted(local_functions))}")
         
+        # Read the content of the header file
+        with open(header_file_path, 'r') as file:
+            header_content = file.read()
+        
+        # Find existing includes
+        existing_includes = set(re.findall(r'#include\s*"([^"]+)"', header_content))
+        
         # Collect includes for functions found in dict_prototypes
         includes = {}
         for func_name in local_functions:
@@ -964,18 +947,15 @@ def insert_local_includes(base_name):
                 defined_in, file_path = dict_prototypes[func_name]
                 if file_path != base_name:  # Skip if defined in the same file
                     include_file = os.path.splitext(file_path)[0] + ".h"
-                    include_line = f'#include "{include_file}"'
-                    if include_line not in includes:
-                        includes[include_line] = []
-                    includes[include_line].append(func_name)
+                    if include_file not in existing_includes:  # Check if include already exists
+                        include_line = f'#include "{include_file}"'
+                        if include_line not in includes:
+                            includes[include_line] = []
+                        includes[include_line].append(func_name)
         
         if not includes:
-            logging.info(f"\tNo function includes needed for {base_name}")
+            logging.info(f"\tNo new function includes needed for {base_name}")
             return
-        
-        # Read the content of the header file
-        with open(header_file_path, 'r') as file:
-            header_content = file.read()
         
         # Find the position of the local_headers_marker
         marker = '#include "allDefines.h"'
@@ -995,6 +975,7 @@ def insert_local_includes(base_name):
         insert_pos = marker_pos + len(marker) + 1  # +1 for the newline
         includes_text = ""
         for include, functions in sorted(includes.items()):
+            logging.info(f"\t{include:<30} ({', '.join(functions)})")
             functions_str = ", ".join(sorted(functions))
             includes_text += f"//-- {functions_str}\n{include}\n"
         
@@ -1015,13 +996,73 @@ def insert_local_includes(base_name):
         logging.error(f"\tError processing file [{base_name}]: {str(e)}")
         exit()
 
-    logging.info(f"\tInserted {len(includes)} function includes into {os.path.basename(header_file_path)}")
+    logging.info(f"\tInserted {len(includes)} new function includes into {os.path.basename(header_file_path)}")
+
+#------------------------------------------------------------------------------------------------------
+def add_all_includes():
+    logging.info("");
+    logging.info(f"Processing add_all_includes(): {glob_project_name}")
+
+    try:
+        project_header = os.path.join(glob_pio_include, f"{glob_project_name}.h")
+        # Read the content of the source file
+        with open(project_header, 'r') as file:
+            content = file.read()
+
+        # Create a set of existing includes
+        existing_includes = set(re.findall(r'#include\s*[<"]([^>"]+)[>"]', content))
+
+        # Prepare new includes
+        new_includes = []
+        for file_name in os.listdir(glob_pio_include):
+            logging.debug(f"\tProcessing file: {file_name}")
+            header_name = os.path.basename(file_name)  # Get the basename
+            if header_name not in existing_includes:
+                new_includes.append(f'#include "{header_name}"')
+
+        if not new_includes:
+            return   # No new includes to add
+        
+        logging.debug(f"\tFound {len(new_includes)} new includes: {', '.join(new_includes)}")
+
+        # Find the insertion point
+        marker = localheaders_marker
+        insertion_point = content.find(marker)
+        if insertion_point == -1:
+            marker = convertor_marker
+            insertion_point = content.find(marker)
+            if insertion_point == -1:
+                # If neither marker is found, find the end of the header guard
+                marker = ""
+                header_guard_end = re.search(r'#define\s+\w+_H\s*\n', content)
+                if header_guard_end:
+                    insertion_point = header_guard_end.end()
+                else:
+                    logging.info("\tCannot find suitiblae insertion point")
+                    return  
+
+        insertion_point += len(marker)
+        # Insert new includes
+        before = content[:insertion_point]
+        after = content[insertion_point:]
+        new_content = before + '\n' + '\n'.join(new_includes) + '\n' + after
+        
+        # Write the modified content back to the header file
+        with open(project_header, 'w') as file:
+            file.write(new_content)
+
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        line_number = exc_tb.tb_lineno
+        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
+        #logging.error(f"\tError processing file {file_path}: {str(e)}")
+        exit()
 
 #------------------------------------------------------------------------------------------------------
 def copy_project_files():
     """Copy .ino files to glob_pio_src and .h files to glob_pio_include."""
     logging.info("")
-    logging.info("copy project files ..")
+    logging.info("Processing copy_project_files() ..")
 
     # Check if the file exists
     allDefines_path = os.path.join(glob_pio_include, "allDefines.h")
@@ -1034,12 +1075,12 @@ def copy_project_files():
 
     for file in os.listdir(glob_ino_project_folder):
         if file.endswith('.ino'):
-            logging.info(f"\tCopy [{file}] ..")
+            logging.info(f"Copy [{file}] ..")
             shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_src)
         elif file.endswith('.h'):
             shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_include)
             #if file.endswith('.h') and file != f"{glob_project_name}.h":
-            logging.info(f"\tCopy [{file}] ..")
+            logging.info(f"Copy [{file}] ..")
             logging.info(f"\tProcessing original header file: {file}")
             base_name = os.path.splitext(file)[0]
             header_path = os.path.join(glob_pio_include, f"{base_name}.h")
@@ -1057,9 +1098,18 @@ def extract_global_variables(file_path):
     Only variables declared outside of all function blocks are considered global.
     """
     logging.info("")
-    logging.info(f"Extracting global variables from : {os.path.basename(file_path)}")
+    logging.info(f"Processing extract_global_variables() from : {os.path.basename(file_path)}")
 
     global_vars = {}
+
+    # Get the fbase (filename without extension)
+    file = os.path.basename(file_path)
+    fbase = os.path.splitext(file)[0]
+
+    # Check if there are existing entries in dict_global_variables for this fbase
+    if fbase in dict_global_variables:
+        global_vars[fbase] = dict_global_variables[fbase]
+        logging.info(f"\tFound existing global variables for {fbase} in dict_global_variables")
 
     # Comprehensive list of object types, including String
     types = r'(?:uint8_t|int8_t|uint16_t|int16_t|uint32_t|int32_t|uint64_t|int64_t|char|int|float|double|bool|boolean|long|short|unsigned|signed|size_t|void|String|time_t|struct tm)'
@@ -1107,19 +1157,33 @@ def extract_global_variables(file_path):
                     for var_name in var_declarations:
                         base_name = var_name.split('[')[0].strip()
                         if base_name not in keywords:
-                            file_vars.append((var_type, var_name, current_function))
-                            #logging.info(f"Global variable found: [{var_type} {var_name}] in function [{current_function}]")
+                            # Check for pointer in var_type or var_name
+                            is_pointer = var_type.endswith('*') or var_name.startswith('*')
+                            
+                            # Remove asterisk from var_type if it ends with one
+                            if var_type.endswith('*'):
+                                var_type = var_type.rstrip('*').strip()
+                            
+                            # Remove asterisk from var_name if it starts with one
+                            if var_name.startswith('*'):
+                                var_name = var_name.lstrip('*').strip()
+                            
+                            file_vars.append((var_type, var_name, current_function, is_pointer))
                             logging.info(f"\tGlobal variable found: [{var_type} {var_name}]")
+                            if is_pointer:
+                                logging.info(f"\t\tPointer variable detected: [{var_type} {var_name}]")
 
         # Remove duplicate entries
         unique_file_vars = list(set(file_vars))
 
-        file = os.path.basename(file_path)
-        fbase = os.path.splitext(file)[0]
-        global_vars[fbase] = unique_file_vars
+        # Add new global variables to the existing ones
+        if fbase in global_vars:
+            global_vars[fbase].extend(unique_file_vars)
+        else:
+            global_vars[fbase] = unique_file_vars
 
         if unique_file_vars:
-            logging.info(f"\tProcessed {os.path.basename(file_path)} successfully. Found {len(unique_file_vars)} global variables.")
+            logging.info(f"\tProcessed {os.path.basename(file_path)} successfully. Found {len(unique_file_vars)} new global variables.")
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -1128,78 +1192,116 @@ def extract_global_variables(file_path):
         logging.error(f"\tError processing file {file_path}: {str(e)}")
         exit()
 
-    if unique_file_vars:
-        logging.info("\tExtracted all global variables\n")
+    if global_vars[fbase]:
+        logging.info(f"\tTotal global variables for {fbase}: {len(global_vars[fbase])}")
     else:
         logging.info("\t>> No global variables found")
 
     return global_vars
 
 #------------------------------------------------------------------------------------------------------
-def extract_undefined_vars_in_functions(file_path):
+def extract_undefined_vars_in_file(file_path):
     """
-    Extract all variables that are used in the functions of an Arduino program
-    that have no define in that function and are also in dict_global_variables.
+    Extract all variables that are used in the file but not properly defined.
+    Check if the variable is in the global dict_global_variables array.
+    If it's in dict_global_variables with a different base-name, add it to the 'undefined_vars' array.
+    Variables not found in dict_global_variables or with unknown types are not added to the 'undefined_vars' array.
     
     Args:
     file_path (str): Path to the Arduino file (.ino or .cpp)
     
     Returns:
-    dict: Dictionary of global variables used in functions, with their line numbers, file names, var_type, var_name, and defined file
+    dict: Dictionary of undefined variables used in the file, with their line numbers, file names, var_type, var_name, and defined file
     """
-    logging.info("")
-    logging.info(f"extract undefined vars in functions file: [{os.path.basename(file_path)}] in  {short_path(file_path)}")
+    logging.info("===========================")
+    logging.info(f"Processing extract_undefined_vars_in_file() for file: [{os.path.basename(file_path)}]")
+
+    # List of C++ keywords and common Arduino types/functions to exclude
+    KEYWORDS_AND_TYPES = set([
+        "if", "else", "for", "while", "do", "switch", "case", "default", "break", "continue",
+        "return", "goto", "try", "catch", "throw", "true", "false", "null", "const", "static",
+        "volatile", "unsigned", "signed", "void", "char", "short", "int", "long", "float",
+        "double", "bool", "String", "byte", "word", "boolean", "array", "sizeof", "setup",
+        "loop", "HIGH", "LOW", "INPUT", "OUTPUT", "INPUT_PULLUP", "LED_BUILTIN", "serial"
+    ])
 
     try:
-      with open(file_path, 'r') as file:
-          content = file.read()
-      
-      # Remove comments
-      content = re.sub(r'//.*?\n|/\*.*?\*/', '', content, flags=re.DOTALL)
-      
-      # Find all function definitions
-      functions = re.findall(r'(\w+\s+\w+\s*\([^)]*\)\s*{[^}]*})', content, re.DOTALL)
-      
-      global_vars_undefined = {}
-      
-      #print_dict(dict_global_variables)
+        with open(file_path, 'r') as file:
+            content = file.read()
+        
+        # Remove comments
+        content = re.sub(r'//.*?\n|/\*.*?\*/', '', content, flags=re.DOTALL)
 
-      # Create a lookup dictionary for quick access to variable information
-      var_lookup = {}
-      for defined_file, file_vars in dict_global_variables.items():
-          for var_type, var_name, xxx in file_vars:
-              var_lookup[var_name] = (var_type, os.path.basename(defined_file)+'.ino')
-      
-      for function in functions:
-          # Extract function body
-          body = re.search(r'{(.*)}', function, re.DOTALL).group(1)
-          
-          # Find all variables used in the function
-          matches = re.finditer(r'\b([a-zA-Z_]\w*)\b', body)
-          
-          for match in matches:
-              var = match.group(1)
-              if var in var_lookup and var not in global_vars_undefined:
-                  # Find the line number in the original file
-                  line_number = content[:match.start()].count('\n') + 1
-                  var_type, defined_file = var_lookup[var]
-                  global_vars_undefined[var] = {
-                      'line': line_number,
-                      'function': extract_word_by_position(function, 1, "("),
-                      'used_in': os.path.basename(file_path).split('.')[0],
-                      'var_type': var_type,
-                      'var_name': var,
-                      'defined_in': os.path.splitext(defined_file)[0]
-                  }
-
+        undefined_vars = {}
+        
+        current_file_basename = os.path.splitext(os.path.basename(file_path))[0]
+        
+        # Find all variable declarations in the file
+        declarations = re.findall(r'\b(?:const\s+)?(?:unsigned\s+)?(?:static\s+)?(?:volatile\s+)?\w+\s+([a-zA-Z_]\w*)(?:\s*=|\s*;|\s*\[)', content)
+        declared_vars = {var for var in declarations if var not in KEYWORDS_AND_TYPES and not var.isdigit()}
+        logging.debug(f"Variables declared in file: {declared_vars}")
+        
+        # Find all variables used in the file
+        used_vars = re.findall(r'\b([a-zA-Z_]\w*)\b', content)
+        used_vars = [var for var in used_vars if var not in KEYWORDS_AND_TYPES and not var.isdigit()]
+        logging.debug(f"Variables used in file: {set(used_vars)}")
+        
+        # Identify potentially undefined variables
+        for var in set(used_vars) - declared_vars:
+            # Check if the variable is in dict_global_variables
+            var_found = False
+            var_type = 'Unknown'
+            defined_in = 'Undefined'
+            global_var_name = var
+            v_is_pointer = False
+            
+            for defined_file, file_vars in dict_global_variables.items():
+                defined_file_basename = os.path.splitext(os.path.basename(defined_file))[0]
+                for v_type, v_name, is_pointer, _ in file_vars:
+                    if v_name == var or (not '[' in var and re.match(rf'^{re.escape(var)}\[', v_name)):
+                        var_found = True
+                        var_type = v_type
+                        defined_in = defined_file_basename
+                        global_var_name = v_name  # Store the name as found in dict_global_variables
+                        v_is_pointer = is_pointer
+                        if defined_file_basename == current_file_basename:
+                            # Variable is defined in the same file, so it's not undefined
+                            if args.debug:
+                                logging.info(f"Variable {var} found in global variables of the same file")
+                            break
+                if var_found:
+                    break
+            
+            if var_found and defined_in != current_file_basename and var_type != 'Unknown':
+                # Find the first occurrence of the variable in the file
+                match = re.search(r'\b' + re.escape(var) + r'\b', content)
+                if match:
+                    line_number = content[:match.start()].count('\n') + 1
+                    key = f"{global_var_name}+{current_file_basename}"
+                    undefined_vars[key] = {
+                        'var_type': var_type,
+                        'var_is_pointer': v_is_pointer,
+                        'var_name': global_var_name,
+                        'used_in': current_file_basename,
+                        'defined_in': defined_in,
+                        'line': line_number
+                    }
+                    if args.debug:
+                        logging.info(f"Added usage of {global_var_name} to undefined_vars: {undefined_vars[key]}")
+                    #else:
+                    #    logging.info(f"Added usage of {global_var_name} to undefined_vars")
+            elif not var_found or var_type == 'Unknown':
+                logging.debug(f"Variable {var} not found in dict_global_variables or has unknown type, skipping")
+    
+        logging.debug(f"Final undefined_vars: {undefined_vars}")
+        
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         line_number = exc_tb.tb_lineno
-        logging.error(f"\tError extract_undefined_vars_in_functions at line {line_number}: {str(e)}")
+        logging.error(f"Error extract_undefined_vars_in_file at line {line_number}: {str(e)}")
         exit()
     
-    return global_vars_undefined
-
+    return undefined_vars
 
 #------------------------------------------------------------------------------------------------------
 def extract_prototypes(file_path):
@@ -1213,7 +1315,7 @@ def extract_prototypes(file_path):
     dict: Dictionary of function prototypes found in the file, with function names as keys and tuples (prototype, file_path) as values.
     """
     logging.info("")
-    logging.info(f"Processing extract prototypes from file: [{os.path.basename(file_path)}]")
+    logging.info(f"Processing extract_prototypes() from file: [{os.path.basename(file_path)}]")
     
     prototypes = {}
     
@@ -1270,80 +1372,92 @@ def extract_class_instances(file_path):
     Only global class instance declarations are considered.
     """
     logging.info("")
-    logging.info(f"Processing extract class instances from: {short_path(file_path)}")
+    logging.info(f"Processing extract_class_instances() from: {short_path(file_path)}")
 
     file  = os.path.basename(file_path)
     fbase = os.path.splitext(file)[0]
 
     class_instances = {}
     
-    # Enhanced pattern for class instance declarations
-    class_pattern = r'^\s*((?:const\s+)?(?:\w+::)*\w+(?:<.*?>)?)\s+(\w+)\s*(?:\((.*?)\))?\s*;'
+    # Read already found instances from the global dict_class_instances
+    if file_path in dict_class_instances:
+        class_instances[file_path] = dict_class_instances[file_path]
     
+    # Pattern for class instance declarations
+    class_pattern = r'^\s*([A-Z]\w+(?:<.*?>)?)\s+(\w+)(?:\s*\((.*?)\))?\s*;'
+
     # Extended list of known classes
     known_classes = [
-        'WiFiServer', 'ESP8266WebServer', 'ESP8266HTTPUpdateServer', 'WiFiClient',
-        'File', 'FSInfo', 'WiFiManager', 'Timezone', 'DNSServer', 'ESP8266WebServer',
+        'WiFiServer', 'ESP8266WebServer', 'WiFiClient', 'WebServer',
+        'File', 'FSInfo', 'WiFiManager', 'Timezone', 'DNSServer',
         'ESP8266mDNS', 'ArduinoOTA', 'PubSubClient', 'NTPClient', 'Ticker',
         'ESP8266HTTPClient', 'WebSocketsServer', 'AsyncWebServer', 'AsyncWebSocket',
         'SPIFFSConfig', 'HTTPClient', 'WiFiUDP', 'ESP8266WiFiMulti', 'ESP8266SSDP',
-        'ESP8266HTTPUpdateServer', 'ESP8266WebServer', 'ESP8266mDNS'
+        'ESP8266HTTPUpdateServer', 'ESP8266mDNS', 'Adafruit_Sensor', 'DHT',
+        'LiquidCrystal', 'Servo', 'Stepper', 'SoftwareSerial', 'EEPROM',
+        'TFT_eSPI', 'Adafruit_GFX', 'SD', 'Wire', 'SPI', 'OneWire', 'DallasTemperature',
+        'Adafruit_NeoPixel', 'FastLED', 'IRremote', 'ESP32Encoder', 'CapacitiveSensor',
+        'AccelStepper', 'ESP32Time', 'BluetoothSerial', 'BLEDevice', 'BLEServer',
+        'BLEClient', 'SPIFFS', 'LittleFS', 'ESPAsyncWebServer', 'AsyncTCP',
+        'ESP32_FTPClient', 'PCA9685', 'Adafruit_PWMServoDriver', 'MPU6050',
+        'TinyGPS', 'RTClib', 'Preferences', 'ESPmDNS', 'Update', 'HTTPUpdate',
+        'HTTPSServer', 'HTTPSServerRequest', 'HTTPSServerResponse'
     ]
-    
     # Common class suffixes
-    common_suffixes = ['Client', 'Server', 'Class', 'Manager', 'Handler', 'Controller', 'Service', 'Factory', 'Builder']
-        
+    common_suffixes = ['Client', 'Server', 'Class', 'Manager', 'Handler', 'Controller', 
+                       'Service', 'Factory', 'Builder', 'Driver', 'Adapter', 'Wrapper'
+    ]
+
+    
+    # List of standard C types to exclude
+    standard_types = ['int', 'bool', 'char', 'float', 'double', 'void', 'unsigned', 'signed',
+                      'short', 'long', 'uint8_t', 'uint16_t', 'uint32_t', 'uint64_t',
+                      'int8_t', 'int16_t', 'int32_t', 'int64_t', 'size_t', 'wchar_t',
+                      'byte', 'word', 'String', 'string', 'auto', 'const', 'volatile'
+    ]
+   
+    
     try:
         with open(file_path, 'r') as f:
             content = f.read()
-                
-        # Remove comments while preserving string literals
-        #content = remove_comments_preserve_strings(content)
-                
+        
         lines = content.split('\n')
         file_instances = []
         brace_level = 0
-                
+        
         for line_num, line in enumerate(lines, 1):
             stripped_line = line.strip()
-                    
+            
             # Skip lines inside function bodies or class definitions
             brace_level += stripped_line.count('{') - stripped_line.count('}')
             if brace_level > 0:
                 continue
-                        
+            
             class_match = re.search(class_pattern, stripped_line)
             if class_match:
                 class_type = class_match.group(1).strip()
                 instance_name = class_match.group(2).strip()
                 constructor_args = class_match.group(3).strip() if class_match.group(3) else ""
-                    
-                # Check if it's a known class, ends with a common class suffix, or contains 'class'
-                is_class_instance = (
-                    class_type in known_classes or
-                    any(class_type.endswith(suffix) for suffix in common_suffixes) or
-                    'class' in class_type.lower() or
-                    re.search(r'\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)*', class_type) # CamelCase check
-                )
-                    
-                if is_class_instance:
+                
+                # Check if it's a valid class type (starts with uppercase and is either in known_classes or matches the pattern)
+                if class_type[0].isupper() and (class_type in known_classes or re.match(r'^[A-Z]\w+$', class_type)):
                     file_instances.append((class_type, instance_name, constructor_args, fbase))
                     logging.info(f"{fbase}: {class_type} {instance_name}")
                 else:
-                    logging.debug(f"\tPossible class instance (not added) in {fbase}:{line_num}: {class_type} {instance_name}")
-                        
+                    logging.debug(f"\tNot a class instance (not added) in {fbase}:{line_num}: {class_type} {instance_name}")
+        
         if file_instances:
             class_instances[file_path] = file_instances
             logging.info(f"\t>> Found {len(file_instances)} class instances.")
         else:
             logging.info(f"\t>> No class instances found.")
-                                
+        
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         line_number = exc_tb.tb_lineno
         logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
         exit()
-          
+    
     if (len(file_instances) > 0):
         logging.info(f"\tExtracted class instances from {os.path.basename(file_path)} -> found: {len(file_instances)}")
 
@@ -1358,9 +1472,9 @@ def remove_comments(code):
     return code
 
 #------------------------------------------------------------------------------------------------------
-def analyze_file_for_class_instances(base_name):
+def insert_class_instances_to_header_files(base_name):
     logging.info("")
-    logging.info(f"Processing analyze file for class instances: {base_name}")
+    logging.info(f"Processing insert_class_instances_to_header_files(): {base_name}")
 
     # Get the full path of the file under test and its header
     src_path = os.path.join(glob_pio_src, base_name) + '.ino'
@@ -1373,60 +1487,90 @@ def analyze_file_for_class_instances(base_name):
         
         content_without_comments = remove_comments(content)
 
-        # Find all class instances in the file
-        class_instances = re.findall(r'\b(\w+)\s+(\w+)\s*[;=]', content_without_comments)
-        
-        # Collect instances that are not defined in the file
-        undefined_instances = []
-        for class_type, instance_name in class_instances:
-            logging.debug(f"\tlooking for [{class_type:<15}] [{instance_name}]")
-            if class_type not in content_without_comments.split() and f"class {class_type:<15}" not in content_without_comments:
-                logging.debug(f"\tclass {class_type} ....")
-                undefined_instances.append((class_type, instance_name))
+        # Split the content into words
+        words = re.findall(r'\b\w+\b', content_without_comments)
 
-        logging.debug(f"\tundefined_instances: {undefined_instances}")
-        # Generate extern declarations or constructor calls
+        # Check all words against dict_class_instances
         new_declarations = []
-        for class_type, instance_name in undefined_instances:
-            logging.debug(f"\tlooking at [{instance_name}] in [dict_class_instances]")
+        new_includes = []
+        for word in words:
             for file_path, class_list in dict_class_instances.items():
-                logging.debug(f"\tfrom dict_class_instances[{os.path.basename(file_path)}], class_list: [{class_list}]")
                 for cls_type, cls_instance, constructor_args, fbase in class_list:
-                    if cls_instance == instance_name and cls_type == class_type:
-                        logging.debug(f"\tfound {instance_name} in {file_path}")
+                    if word == cls_instance:
+                        # Skip if the class is defined in the same file as the one being tested
+                        if fbase == base_name:
+                            logging.info(f"Skipping [{cls_instance}] as it's defined in the same file: [{fbase}:{base_name}]")
+                            continue
+                        
+                        logging.info(f"Hit found: [{cls_instance}] from {fbase} used in {base_name}")
                         if constructor_args:
-                            declaration = f"{class_type} {instance_name}({constructor_args}); //-- {fbase}"
+                            declaration = f"extern {cls_type} {cls_instance}({constructor_args}); \t//-- {fbase}"
                         else:
-                            declaration = f"extern {class_type} {instance_name}; //-- {fbase}"
+                            declaration = f"extern {cls_type} {cls_instance}; \t//-- {fbase}"
                         new_declarations.append(declaration)
+                        new_includes.append(f"#include <{cls_type}.h>  \t//-- added by convertor")
                         break
-                if new_declarations:  # If we found a match, no need to check other files
+                if new_declarations and new_declarations[-1].startswith(f"{cls_type} {cls_instance}"):
                     break
+
+        # Remove duplicates while preserving order
+        new_declarations = list(dict.fromkeys(new_declarations))
+        new_includes = list(dict.fromkeys(new_includes))
 
         with open(include_path, 'r') as file:
             content = file.read()
 
-        # Find the appropriate insertion point
+        # Find the appropriate insertion point for declarations
+        insert_index = -1
         if externclasses_marker in content:
-            insert_index = content.index(externclasses_marker) + len(externclasses_marker)
+            insert_index = content.find(externclasses_marker) + len(externclasses_marker)
+        elif externvariables_marker in content:
+            insert_index = content.find(externvariables_marker) + len(externvariables_marker)
+        elif convertor_marker in content:
+            insert_index = content.find(convertor_marker) + len(convertor_marker)
         else:
-            extern_matches = list(re.finditer(r'^extern\s+\w+\s+\w+;', content, re.MULTILINE))
-            if extern_matches:
-                insert_index = extern_matches[-1].end()
+            # Look for header guards
+            header_guard_end = content.find("#endif")
+            if header_guard_end != -1:
+                # Insert after the header guard start and an empty line
+                insert_index = content.find("\n", content.find("#define")) + 1
             else:
-                if externvariables_marker in content:
-                    insert_index = content.index(externvariables_marker) + len(externvariables_marker)
-                else:
-                    insert_index = 0
+                # If no header guard, insert at the top
+                insert_index = 0
 
         # Insert the new declarations
         if new_declarations:
-            if externclasses_marker not in content:
-                new_declarations.insert(0, f"\n{externclasses_marker}")
-            insert_text = "\n" + "\n".join(new_declarations)
-            new_content = content[:insert_index] + insert_text + content[insert_index:]
+            insert_text = "\n" + "\n".join(new_declarations) + "\n"
+            if insert_index == 0:
+                new_content = insert_text + content
+            else:
+                new_content = content[:insert_index] + insert_text + content[insert_index:]
         else:
             new_content = content
+
+        # Find the appropriate insertion point for includes
+        include_index = -1
+        if "#include <Arduino.h>" in new_content:
+            include_index = new_content.find("#include <Arduino.h>") + len("#include <Arduino.h>")
+        else:
+            last_system_include = new_content.rfind('#include <')
+            last_user_include = new_content.rfind('#include "')
+            if last_system_include > last_user_include:
+                include_index = new_content.find('\n', last_system_include) + 1
+            elif last_user_include > -1:
+                include_index = new_content.find('\n', last_user_include) + 1
+            else:
+                # If no includes found, insert after header guard with one empty line
+                header_guard_end = new_content.find("#define")
+                if header_guard_end != -1:
+                    include_index = new_content.find('\n', header_guard_end) + 1
+                else:
+                    include_index = 0
+
+        # Insert the new includes
+        if new_includes:
+            include_text = "\n".join(new_includes) + "\n"
+            new_content = new_content[:include_index] + "\n" + include_text + new_content[include_index:]
 
         # Write the updated content back to the file
         with open(include_path, 'w') as file:
@@ -1442,7 +1586,7 @@ def analyze_file_for_class_instances(base_name):
 def update_header_with_prototypes(header_path, prototypes):
     """Update header file with function prototypes."""
     logging.info()
-    logging.info(f"update header file: {os.path.basename(header_path)}")
+    logging.info(f"Processing update_header_with_prototypes() file: {os.path.basename(header_path)}")
 
     marker_index = header_path.find(platformio_marker)
     if marker_index != -1:
@@ -1500,7 +1644,7 @@ def find_undefined_functions_and_update_headers(glob_pio_src, glob_pio_include, 
     NON_FUNCTION_KEYWORDS = {'if', 'else', 'for', 'while', 'switch', 'case', 'default', 'do', 'return', 'break', 'continue'}
 
     logging.info()
-    logging.info("find undefined functions and update headers")
+    logging.info("Processing find_undefined_functions_and_update_headers")
 
     for file in os.listdir(glob_pio_src):
         if file.endswith('.cpp'):
@@ -1580,7 +1724,7 @@ def find_undefined_functions_and_update_headers(glob_pio_src, glob_pio_include, 
 #------------------------------------------------------------------------------------------------------
 def process_function_references(glob_pio_src, glob_pio_include):
     logging.info()
-    logging.info("process function references")
+    logging.info("Process process_function_references()")
 
     function_reference_array = {}
 
@@ -1636,7 +1780,7 @@ def process_ino_files(glob_pio_src, glob_pio_include, glob_project_name, global_
     global_extern_declarations = set()  # Reset global extern declarations
 
     logging.info("")
-    logging.debug(f"process ino files: {global_vars}")
+    logging.debug(f"Processing process_ino_files(): {global_vars}")
 
     main_ino = f"{glob_project_name}.ino"
     #aaw#main_ino_path = os.path.join(glob_pio_src, main_ino)
@@ -1696,7 +1840,7 @@ def process_ino_files(glob_pio_src, glob_pio_include, glob_project_name, global_
 #------------------------------------------------------------------------------------------------------
 def add_guards_and_marker_to_header(file_path):
     logging.info("")
-    logging.info(f"add guards and marker to header file: [{os.path.basename(file_path)}]")
+    logging.info(f"Processing add_guards_and_marker_to_header() file: [{os.path.basename(file_path)}]")
     
     with open(file_path, 'r') as file:
         content = file.read()
@@ -1745,12 +1889,12 @@ def add_guards_and_marker_to_header(file_path):
     with open(file_path, 'w') as file:
         file.write(modified_content)
     
-    print(f"\tFile {os.path.basename(file_path)} has been successfully modified.")
+    logging.info(f"\tFile {os.path.basename(file_path)} has been successfully modified.")
 
 #------------------------------------------------------------------------------------------------------
 def insert_header_include_in_cpp(file_path):
     logging.info("")
-    logging.info(f"insert header include in cpp: [{os.path.basename(file_path)}]")
+    logging.info(f"Processing insert_header_include_in_cpp(): [{os.path.basename(file_path)}]")
     
     with open(file_path, 'r') as file:
         content = file.read()
@@ -1804,7 +1948,7 @@ def insert_header_include_in_cpp(file_path):
 def preserve_original_headers():
     """Read and preserve the original content of all existing header files."""
     logging.info("")
-    logging.info("preserve original headers")
+    logging.info("Processing preserve_original_headers() ..")
 
     original_headers = {}
     for file in os.listdir(glob_pio_include):
@@ -1815,21 +1959,12 @@ def preserve_original_headers():
 
     return original_headers
 
-#------------------------------------------------------------------------------------------------------
-def XXX_preserve_original_header(glob_pio_include, file_name):
-    """Read and preserve the original content of a specific header file."""
-    header_path = os.path.join(glob_pio_include, file_name)
-    if os.path.exists(header_path):
-        with open(header_path, 'r') as f:
-            return f.read()
-        
-    return None
 
 #------------------------------------------------------------------------------------------------------
 def update_project_header(glob_pio_include, glob_project_name, original_content):
     """Update project header file with includes for all created headers while preserving original content."""
     logging.info("")
-    logging.info("update project header")
+    logging.info("Processing update_project_header() ..")
 
     project_header_path = os.path.join(glob_pio_include, f"{glob_project_name}.h")
 
@@ -1917,19 +2052,23 @@ def main():
                 for file in files:
                     if file.endswith(('.h', '.ino')):
                         file_path = os.path.join(root, file)
-                        base_name = os.path.splitext(file)[0]  # Get the basename without extension
+                        #base_name = os.path.splitext(file)[0]  # Get the basename without extension
+                        base_name = os.path.basename(file)  # Get the basename without extension
                         logging.info("")
                         logging.info("-------------------------------------------------------------------------------------------------------")
                         logging.info(f"Processing file: {short_path(file_path)} basename: [{base_name}]")
 
                         global_vars = extract_global_variables(file_path)
-                        print_global_vars(global_vars)
+                        if args.debug:
+                            print_global_vars(global_vars)
                         dict_global_variables.update(global_vars)
                         class_instances = extract_class_instances(file_path)
-                        print_class_instances(class_instances)
+                        if args.debug:
+                            print_class_instances(class_instances)
                         dict_class_instances.update(class_instances)
                         prototypes = extract_prototypes(file_path)
-                        print_functions(prototypes)
+                        if args.debug:
+                            print_functions(prototypes)
                         dict_prototypes.update(prototypes)
                         if file.endswith('.h') and file != "allDefines.h":
                             add_guards_and_marker_to_header(file_path)
@@ -1953,7 +2092,7 @@ def main():
                     if file.endswith(('.h', '.ino')):
                         file_path = os.path.join(root, file)
                         base_name = os.path.splitext(file)[0]  # Get the basename without extension
-                        global_vars_undefined = extract_undefined_vars_in_functions(file_path)
+                        global_vars_undefined = extract_undefined_vars_in_file(file_path)
                         print_global_vars_undefined(global_vars_undefined)
                         dict_undefined_vars_used.update(global_vars_undefined)
 
@@ -1966,10 +2105,8 @@ def main():
         logging.info(f"[Step 3] Create new header files for all '.ino' files")
         logging.info("=======================================================================================================")
 
-        search_folders = [glob_pio_src, glob_pio_include]
-
         for filename in os.listdir(glob_pio_src):
-            logging.debug(f"Processing file: {filename}")
+            #logging.debug(f"Processing file: {filename}")
             ino_name = os.path.basename(filename)
             base_name = os.path.splitext(ino_name)[0]  # Get the basename without extension
             header_name = ino_name.replace(".ino", ".h")
@@ -1979,6 +2116,8 @@ def main():
                 insert_external_variables(base_name)
                 insert_local_includes(ino_name)
 
+        add_all_includes()
+        
         logging.info("")
         logging.info("=======================================================================================================")
         logging.info(f"[Step 4] Check all '.ino' and '.h' files")
@@ -1991,7 +2130,15 @@ def main():
             logging.info(f"\t\tProcessing ino_file: {ino_name}")
             base_name = os.path.splitext(ino_name)[0]  # Get the basename without extension
             logging.info(f"\t\t\tbase_name: {base_name}")
-            analyze_file_for_class_instances(base_name)
+            insert_class_instances_to_header_files(base_name)
+
+        logging.info("")
+        logging.info("=======================================================================================================")
+        logging.info(f"[Step 5] insert an #include for all '.h' files in {glob_project_name}.h")
+        logging.info("=======================================================================================================")
+
+        for filename in os.listdir(glob_pio_src):
+            logging.debug(f"\tProcessing filename: {filename}")
 
 
         logging.info("")
@@ -2010,20 +2157,6 @@ def main():
                 cpp_path = os.path.join(glob_pio_src, cpp_name)
                 rename_file(ino_path, cpp_path)
                 insert_header_include_in_cpp(cpp_path)
-
-
-        exit()
-
-        original_headers = preserve_original_headers(glob_pio_include)
-
-        update_header_with_externs(glob_pio_include, global_vars, class_instances, used_vars_by_file, glob_project_name)
-
-        function_reference_array = process_function_references(glob_pio_src, glob_pio_include)
-
-        find_undefined_functions_and_update_headers(glob_pio_src, glob_pio_include, function_reference_array)
-
-        main_header_path = os.path.join(glob_pio_include, f"{glob_project_name}.h")
-        add_guards_and_marker_to_headers(glob_pio_include, glob_project_name)
 
         logging.info("Arduino to PlatformIO conversion completed successfully")
 

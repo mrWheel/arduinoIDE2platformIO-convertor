@@ -2,8 +2,7 @@
 ***************************************************************************  
 **  Program  : ESP_ticker (lichtkrant)
 */
-//#define FWversion "v1.7.3 (04-05-2023)"
-const char *FWversion = "v1.7.3 (04-05-2023)";
+const char* FWversion = "v1.7.3 (04-05-2023)";
 /* 
 **  Copyright (c) 2021 .. 2023 Willem Aandewiel
 **
