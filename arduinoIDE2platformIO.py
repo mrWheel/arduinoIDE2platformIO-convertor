@@ -6,7 +6,7 @@
 #
 #   by        : Willem Aandewiel
 #
-#   Version   : v0.7 (06-08-2024)
+#   Version   : v0.71 (07-08-2024)
 #
 #------------------------------------------------------------
 import os
@@ -18,6 +18,33 @@ import logging
 import traceback
 from datetime import datetime
 from collections import OrderedDict
+
+# Extended list of known classes
+dict_known_classes = [
+        'WiFiServer', 'ESP8266WebServer', 'WiFiClient', 'WebServer',
+        'WiFiManager', 'Timezone', 'DNSServer', 'IPAddress'
+        'ESP8266mDNS', 'ArduinoOTA', 'PubSubClient', 'NTPClient', 'Ticker',
+        'ESP8266HTTPClient', 'WebSocketsServer', 'AsyncWebServer', 'AsyncWebSocket',
+        'SPIFFSConfig', 'HTTPClient', 'WiFiUDP', 'ESP8266WiFiMulti', 'ESP8266SSDP',
+        'ESP8266HTTPUpdateServer', 'ESP8266mDNS', 'Adafruit_Sensor', 'DHT',
+        'LiquidCrystal', 'Servo', 'Stepper', 'SoftwareSerial', 'EEPROM',
+        'TFT_eSPI', 'Adafruit_GFX', 'SD', 'Wire', 'SPI', 'OneWire', 'DallasTemperature',
+        'Adafruit_NeoPixel', 'FastLED', 'IRremote', 'ESP32Encoder', 'CapacitiveSensor',
+        'AccelStepper', 'ESP32Time', 'BluetoothSerial', 'BLEDevice', 'BLEServer',
+        'BLEClient', 'SPIFFS', 'LittleFS', 'ESPAsyncWebServer', 'AsyncTCP',
+        'ESP32_FTPClient', 'PCA9685', 'Adafruit_PWMServoDriver', 'MPU6050',
+        'TinyGPS', 'RTClib', 'Preferences', 'ESPmDNS', 'Update', 'HTTPUpdate',
+        'HTTPSServer', 'HTTPSServerRequest', 'HTTPSServerResponse'
+    ]
+
+# Dictionary of libraries and their associated objects
+dict_singleton_classes = {
+    "LittleFS.h": ["Dir", "FSinfo", "File", "FS", "LittleFS"],
+    "SPI.h":      ["SPI", "SPISettings", "SPIClass"],
+    "Wire.h":     ["Wire", "TwoWire"],
+    "IPAddress.h": ["IPAddress"]
+    # Add other libraries and their keywords here
+}
 
 args                      = None
 glob_project_name         = ""
@@ -153,6 +180,67 @@ def short_path(directory_path):
     else:
         return f"{directory_path}"
     
+#------------------------------------------------------------------------------------------------------
+def find_marker_position(content, prio_marker):
+
+    try:
+        if (content == ""):
+            logging.error(f"find_marker_position(): content is empty")
+            return -1
+        
+        marker = prio_marker
+        marker_index = content.find(marker)
+        if marker_index != -1:
+            return marker_index + len(marker +'\n')
+        
+        marker = localheaders_marker
+        marker_index = content.find(marker)
+        if marker_index != -1:
+            return marker_index + len(marker +'\n')
+        
+        marker = externvariables_marker
+        marker_index = content.find(marker)
+        if marker_index != -1:
+            return marker_index + len(marker +'\n')
+        
+        marker = prototypes_marker
+        marker_index = content.find(marker)
+        if marker_index != -1:
+            return marker_index + len(marker +'\n')
+        
+        marker = convertor_marker
+        marker_index = content.find(marker)
+        if marker_index != -1:
+            return marker_index + len(marker +'\n')
+
+        marker = ""
+        header_guard_end = re.search(r'#define\s+\w+_H\s*\n', content)
+        if header_guard_end:
+            return header_guard_end.end()
+
+        loggin.info("")
+        logging.info("################################### no markers found! ##################################")
+        logging.info(f"{content}\n")
+        logging.info("################################### no markers found! ##################################\n\n")
+
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        line_number = exc_tb.tb_lineno
+        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
+        logging.error(f"\tError creating allDefines.h: {str(e)}")
+        exit()
+
+    logging.info("\t\t\t===> no markers found!")
+    return 0
+
+#------------------------------------------------------------------------------------------------------
+def remove_comments(code):
+    # Remove single-line comments
+    code = re.sub(r'//.*', '', code)
+    # Remove multi-line comments
+    code = re.sub(r'/\*[\s\S]*?\*/', '', code)
+    return code
+   
 #------------------------------------------------------------------------------------------------------
 def print_global_vars(global_vars):
     """
@@ -446,47 +534,59 @@ def recreate_pio_folders():
     logging.info("\tPlatformIO folder structure recreated")
 
 #------------------------------------------------------------------------------------------------------
-def insert_include_in_header(header_path, text):
-    include_statement = f'#include "{text}"\n'
+def insert_include_in_header(header_lines, inserts):
+    """
+    Insert #include statements in the header file.
+    """
+    logging("")
+    logging.info("Processing insert_include_in_header() ..")
 
-    marker_index = header_path.find(platformio_marker)
-    if marker_index != -1:
-        part_of_path = header_path[marker_index + len({platformio_marker}):]
-        logging.info(f"Updating {part_of_path} with new includes: {text}")
-    else:
-        logging.info(f"Updating {header_path} with new includes: {text}")
+    includes_to_add = []
+    includes_added = set()
 
-    # Read the header file
-    with open(header_path, 'r') as file:
-        lines = file.readlines()
-    
-    # Check if the include statement already exists
-    for line in lines:
-        if include_statement.strip() in line.strip():
-            return  # The include statement already exists
-    
-    # Look for "==local includes=="
-    for i, line in enumerate(lines):
-        if "==local includes==" in line:
-            lines.insert(i + 1, include_statement)
-            break
-    else:
-        # Look for any "#include " statement
-        for i, line in enumerate(lines):
-            if line.startswith('#include "'):
-                lines.insert(i + 1, include_statement)
+    # Process inserts
+    for item in inserts:
+        class_name = item[0]
+        logging.info(f"\t\tChecking if {class_name} ...")
+        
+        # Check if the class is in dict_singleton_classes
+        singleton_header = None
+        for header, classes in dict_singleton_classes.items():
+            logging.info(f"\t\tChecking if {class_name} is in {header}")
+            if class_name in classes or class_name == header:
+                singleton_header = header
                 break
+        
+        if singleton_header:
+            if singleton_header not in includes_added:
+                includes_to_add.append(f'#include <{singleton_header}>\t\t//-- singleton')
+                includes_added.add(singleton_header)
+                logging.info(f"\t\tAdding #{class_name} via <{singleton_header}>")
+        elif class_name.endswith('.h'):
+            if class_name not in includes_added:
+                includes_to_add.append(f'#include <{class_name}>')
+                includes_added.add(class_name)
+                logging.info(f"\t\tAdding <{class_name}>")
         else:
-            # Insert at the top of the file
-            lines.insert(0, include_statement)
-    
-    # Write the modified lines back to the file
-    with open(header_path, 'w') as file:
-        file.writelines(lines)
+            if class_name not in includes_added:
+                includes_to_add.append(f'#include <{class_name}.h>')
+                includes_added.add(class_name)
+                logging.info(f"\t\tAdding <{class_name}.h>")
 
-    logging.info(f"\tUpdated {short_path(header_path)} with new includes: [{text}]")
+    # Find the position to insert the new includes
+    insert_position = 0
+    for i, line in enumerate(header_lines):
+        if line.strip().startswith('#include'):
+            insert_position = i + 1
+        elif not line.strip().startswith('#') and line.strip() != '':
+            break
 
+    # Insert the new includes
+    for include in includes_to_add:
+        header_lines.insert(insert_position, include + '\n')
+        insert_position += 1
 
+    return header_lines
 
 
 #------------------------------------------------------------------------------------------------------
@@ -772,6 +872,7 @@ def process_original_header_file(header_path, base_name):
             # Only write to the file if changes were made
             with open(header_path, 'w') as f:
                 f.write(new_content)
+
             logging.info(f"\tUpdated original header file: {short_path(header_path)}")
         else:
             logging.info(f"\tNo changes needed for: {short_path(header_path)}")
@@ -1075,6 +1176,9 @@ def copy_project_files():
 
     for file in os.listdir(glob_ino_project_folder):
         if file.endswith('.ino'):
+            logging.info(f"Copy [{file}] ..")
+            shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_src)
+        if file.endswith('.cpp'):
             logging.info(f"Copy [{file}] ..")
             shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_src)
         elif file.endswith('.h'):
@@ -1385,37 +1489,6 @@ def extract_class_instances(file_path):
     
     # Pattern for class instance declarations
     class_pattern = r'^\s*([A-Z]\w+(?:<.*?>)?)\s+(\w+)(?:\s*\((.*?)\))?\s*;'
-
-    # Extended list of known classes
-    known_classes = [
-        'WiFiServer', 'ESP8266WebServer', 'WiFiClient', 'WebServer',
-        'File', 'FSInfo', 'WiFiManager', 'Timezone', 'DNSServer',
-        'ESP8266mDNS', 'ArduinoOTA', 'PubSubClient', 'NTPClient', 'Ticker',
-        'ESP8266HTTPClient', 'WebSocketsServer', 'AsyncWebServer', 'AsyncWebSocket',
-        'SPIFFSConfig', 'HTTPClient', 'WiFiUDP', 'ESP8266WiFiMulti', 'ESP8266SSDP',
-        'ESP8266HTTPUpdateServer', 'ESP8266mDNS', 'Adafruit_Sensor', 'DHT',
-        'LiquidCrystal', 'Servo', 'Stepper', 'SoftwareSerial', 'EEPROM',
-        'TFT_eSPI', 'Adafruit_GFX', 'SD', 'Wire', 'SPI', 'OneWire', 'DallasTemperature',
-        'Adafruit_NeoPixel', 'FastLED', 'IRremote', 'ESP32Encoder', 'CapacitiveSensor',
-        'AccelStepper', 'ESP32Time', 'BluetoothSerial', 'BLEDevice', 'BLEServer',
-        'BLEClient', 'SPIFFS', 'LittleFS', 'ESPAsyncWebServer', 'AsyncTCP',
-        'ESP32_FTPClient', 'PCA9685', 'Adafruit_PWMServoDriver', 'MPU6050',
-        'TinyGPS', 'RTClib', 'Preferences', 'ESPmDNS', 'Update', 'HTTPUpdate',
-        'HTTPSServer', 'HTTPSServerRequest', 'HTTPSServerResponse'
-    ]
-    # Common class suffixes
-    common_suffixes = ['Client', 'Server', 'Class', 'Manager', 'Handler', 'Controller', 
-                       'Service', 'Factory', 'Builder', 'Driver', 'Adapter', 'Wrapper'
-    ]
-
-    
-    # List of standard C types to exclude
-    standard_types = ['int', 'bool', 'char', 'float', 'double', 'void', 'unsigned', 'signed',
-                      'short', 'long', 'uint8_t', 'uint16_t', 'uint32_t', 'uint64_t',
-                      'int8_t', 'int16_t', 'int32_t', 'int64_t', 'size_t', 'wchar_t',
-                      'byte', 'word', 'String', 'string', 'auto', 'const', 'volatile'
-    ]
-   
     
     try:
         with open(file_path, 'r') as f:
@@ -1423,6 +1496,7 @@ def extract_class_instances(file_path):
         
         lines = content.split('\n')
         file_instances = []
+        included_headers = set()
         brace_level = 0
         
         for line_num, line in enumerate(lines, 1):
@@ -1438,13 +1512,31 @@ def extract_class_instances(file_path):
                 class_type = class_match.group(1).strip()
                 instance_name = class_match.group(2).strip()
                 constructor_args = class_match.group(3).strip() if class_match.group(3) else ""
-                
                 # Check if it's a valid class type (starts with uppercase and is either in known_classes or matches the pattern)
-                if class_type[0].isupper() and (class_type in known_classes or re.match(r'^[A-Z]\w+$', class_type)):
-                    file_instances.append((class_type, instance_name, constructor_args, fbase))
-                    logging.info(f"{fbase}: {class_type} {instance_name}")
-                else:
-                    logging.debug(f"\tNot a class instance (not added) in {fbase}:{line_num}: {class_type} {instance_name}")
+                if class_type[0].isupper() and (class_type in dict_known_classes or re.match(r'^[A-Z]\w+$', class_type)):
+                    # Check if the class is associated with a specific header in dict_singleton_classes
+                    header_found = False
+                    for header, classes in dict_singleton_classes.items():
+                        if class_type in classes:
+                            if header not in included_headers:
+                                file_instances.append((header, "", "singleton", fbase))
+                                included_headers.add(header)
+                                logging.info(f"{fbase}: Added include for header {header} (class {class_type})")
+                            header_found = True
+                            break
+                    
+                    if not header_found:
+                        file_instances.append((class_type, instance_name, constructor_args, fbase))
+                        logging.info(f"{fbase}: {class_type} {instance_name}")
+        
+        # Check global dict_singleton_classes for objects
+        for header, classes in dict_singleton_classes.items():
+            for class_type in classes:
+                if class_type in content and header not in included_headers:
+                    logging.info(f"\t\tWhat do we have [{class_type}] [{header}]")
+                    file_instances.append((header, "-", "=", fbase))
+                    included_headers.add(header)
+                    logging.info(f"{fbase}: Added include for singleton header {header}")
         
         if file_instances:
             class_instances[file_path] = file_instances
@@ -1464,123 +1556,97 @@ def extract_class_instances(file_path):
     return class_instances
 
 #------------------------------------------------------------------------------------------------------
-def remove_comments(code):
-    # Remove single-line comments
-    code = re.sub(r'//.*', '', code)
-    # Remove multi-line comments
-    code = re.sub(r'/\*[\s\S]*?\*/', '', code)
-    return code
-
-#------------------------------------------------------------------------------------------------------
-def insert_class_instances_to_header_files(base_name):
+def insert_class_instances_to_header_files(file_name):
     logging.info("")
-    logging.info(f"Processing insert_class_instances_to_header_files(): {base_name}")
-
-    # Get the full path of the file under test and its header
-    src_path = os.path.join(glob_pio_src, base_name) + '.ino'
-    header_name = os.path.splitext(base_name)[0] + ".h"
-    include_path = os.path.join(glob_pio_include, f"{header_name}")
+    logging.info(f"Processing insert_class_instances_to_header_files() [{os.path.splitext(os.path.basename(file_name))[0]}]")
+    
+    global dict_class_instances
 
     try:
-        with open(src_path, 'r') as file:
-            content = file.read()
-        
-        content_without_comments = remove_comments(content)
 
-        # Split the content into words
-        words = re.findall(r'\b\w+\b', content_without_comments)
+        #for cpp_file in os.listdir(glob_pio_src):
 
-        # Check all words against dict_class_instances
-        new_declarations = []
-        new_includes = []
-        for word in words:
-            for file_path, class_list in dict_class_instances.items():
-                for cls_type, cls_instance, constructor_args, fbase in class_list:
-                    if word == cls_instance:
-                        # Skip if the class is defined in the same file as the one being tested
-                        if fbase == base_name:
-                            logging.info(f"Skipping [{cls_instance}] as it's defined in the same file: [{fbase}:{base_name}]")
-                            continue
-                        
-                        logging.info(f"Hit found: [{cls_instance}] from {fbase} used in {base_name}")
-                        if constructor_args:
-                            declaration = f"extern {cls_type} {cls_instance}({constructor_args}); \t//-- {fbase}"
-                        else:
-                            declaration = f"extern {cls_type} {cls_instance}; \t//-- {fbase}"
-                        new_declarations.append(declaration)
-                        new_includes.append(f"#include <{cls_type}.h>  \t//-- added by convertor")
-                        break
-                if new_declarations and new_declarations[-1].startswith(f"{cls_type} {cls_instance}"):
-                    break
-
-        # Remove duplicates while preserving order
-        new_declarations = list(dict.fromkeys(new_declarations))
-        new_includes = list(dict.fromkeys(new_includes))
-
-        with open(include_path, 'r') as file:
-            content = file.read()
-
-        # Find the appropriate insertion point for declarations
-        insert_index = -1
-        if externclasses_marker in content:
-            insert_index = content.find(externclasses_marker) + len(externclasses_marker)
-        elif externvariables_marker in content:
-            insert_index = content.find(externvariables_marker) + len(externvariables_marker)
-        elif convertor_marker in content:
-            insert_index = content.find(convertor_marker) + len(convertor_marker)
-        else:
-            # Look for header guards
-            header_guard_end = content.find("#endif")
-            if header_guard_end != -1:
-                # Insert after the header guard start and an empty line
-                insert_index = content.find("\n", content.find("#define")) + 1
-            else:
-                # If no header guard, insert at the top
-                insert_index = 0
-
-        # Insert the new declarations
-        if new_declarations:
-            insert_text = "\n" + "\n".join(new_declarations) + "\n"
-            if insert_index == 0:
-                new_content = insert_text + content
-            else:
-                new_content = content[:insert_index] + insert_text + content[insert_index:]
-        else:
-            new_content = content
-
-        # Find the appropriate insertion point for includes
-        include_index = -1
-        if "#include <Arduino.h>" in new_content:
-            include_index = new_content.find("#include <Arduino.h>") + len("#include <Arduino.h>")
-        else:
-            last_system_include = new_content.rfind('#include <')
-            last_user_include = new_content.rfind('#include "')
-            if last_system_include > last_user_include:
-                include_index = new_content.find('\n', last_system_include) + 1
-            elif last_user_include > -1:
-                include_index = new_content.find('\n', last_user_include) + 1
-            else:
-                # If no includes found, insert after header guard with one empty line
-                header_guard_end = new_content.find("#define")
-                if header_guard_end != -1:
-                    include_index = new_content.find('\n', header_guard_end) + 1
-                else:
-                    include_index = 0
-
-        # Insert the new includes
-        if new_includes:
-            include_text = "\n".join(new_includes) + "\n"
-            new_content = new_content[:include_index] + "\n" + include_text + new_content[include_index:]
-
-        # Write the updated content back to the file
-        with open(include_path, 'w') as file:
-            file.write(new_content)
+            # Generate the corresponding .h file name
+            file_base = os.path.basename(file_name)
+            header_base = os.path.splitext(file_base)[0] + ".h"
+            header_file = os.path.join(glob_pio_include, header_base)
+            logging.info(f"\t\tprocessing [{file_base}] and [{header_base}]")
             
+            # Check if the .h file exists, if not, create it
+            if not os.path.exists(header_file):
+                with open(header_file, 'w') as f:
+                    file_name = os.path.splitext(header_name)[0]
+                    f.write(f"#ifndef _{file_name.upper()}_H_\n")
+                    f.write(f"#define _{file_name.upper()}_H_\n\n")
+                    f.write({localheaders_marker} + "\n\n")
+                    f.write(f"#endif // _{file_name.upper()}_H_\n")
+                logging.info(f"\tCreated header file: {short_path(header_file)}")
+            
+            # Read the content of the .h file
+            with open(header_file, 'r') as f:
+                header_content = f.read()
+
+            # Get the class instances for this file
+            file_instances = []
+            for file_path, instances in dict_class_instances.items():
+                if os.path.basename(file_path) == os.path.basename(header_file):
+                    file_instances = instances
+                    break
+            
+            logging.info(f"\t\t>> Found {len(file_instances)} class instances for [{file_base}]")
+
+            # Process regular class instances and singleton includes
+            includes_to_add = set()
+            for instance in file_instances:
+                class_name = instance[0]
+                logging.info(f"\t\tChecking if {class_name} ...")
+                # Check if it's a singleton include (ends with .h)
+                if class_name.endswith('.h'):
+                    logging.info(f"\t\t#include <{class_name}>")
+                    includes_to_add.add(f'#include <{class_name}>\t\t//== singleton')
+                else:
+                    # Check if the class is in dict_singleton_classes
+                    singleton_header = None
+                    for header, classes in dict_singleton_classes.items():
+                        if class_name in classes:
+                            singleton_header = header
+                            break
+                    
+                    if singleton_header:
+                        includes_to_add.add(f'#include <{singleton_header}>\t\t//-- singleton')
+                    else:
+                        includes_to_add.add(f'#include <{class_name}.h>')
+
+            logging.info(f"includes to add: {includes_to_add}")
+            # Find the position to insert the new includes and insert them
+            insert_pos = find_marker_position(header_content, localheaders_marker)
+            if insert_pos != -1:
+                #insert_pos += len(localheaders_marker + "\n")
+                new_includes = '\n'.join(includes_to_add)
+                logging.info(f"\t\tnew includes: [{new_includes}]")
+                updated_content = (
+                    header_content[:insert_pos] +
+                    new_includes + '\n' +
+                    header_content[insert_pos:]
+                )
+            else:
+                insert_pos = 0
+            # Log the added includes
+            for include in includes_to_add:
+                if include not in header_content:
+                    logging.info(f"\t\t\tAdding {include} to {short_path(header_file)} @ pos[{insert_pos}]")
+
+            # Write the updated content back to the .h file
+            with open(header_file, 'w') as f:
+                f.write(updated_content)
+
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         line_number = exc_tb.tb_lineno
         logging.error(f"An error occurred at line {line_number}: {str(e)}")
         logging.error(f"An error occurred during conversion: {str(e)}")
+
+    logging.info(f"Finished inserting class instances to header file [{file_base }].")
 
 #------------------------------------------------------------------------------------------------------
 def update_header_with_prototypes(header_path, prototypes):
@@ -1652,10 +1718,9 @@ def find_undefined_functions_and_update_headers(glob_pio_src, glob_pio_include, 
             base_name = os.path.splitext(file)[0]
             header_path = os.path.join(glob_pio_include, f"{base_name}.h")
 
-            marker = "testProject"
-            marker_index = header_path.find(marker)
+            marker_index = header_path.find(platformio_marker)
             if marker_index != -1:
-                short_header_path = header_path[marker_index + len(marker):]
+                short_header_path = header_path[marker_index + len(platformio_marker):]
             else:
                 short_header_path = header_path
 
@@ -1688,36 +1753,49 @@ def find_undefined_functions_and_update_headers(glob_pio_src, glob_pio_include, 
                     include_file = function_reference_array[func]
                     # Ensure we don't include the file in itself
                     if include_file != f"{base_name}.h":
-                        include_statement = f'#include "{include_file}"'
+                        include_statement = f'#include "{include_file}\t\t//== by convertor"'
                         if include_statement not in header_content:
                             new_includes.append(include_statement)
 
                 if new_includes:
                     # Find the position to insert new includes
-                    #insert_pos = header_content.find("//== Local Headers ==")
-                    insert_pos = header_content.find(f"{localheaders_marker}")
-                    if insert_pos != -1:
-                        #insert_pos += len("//== Local Headers ==\n")
-                        insert_pos += len(f"{localheaders_marker}\n")
-                        updated_content = (
-                            header_content[:insert_pos] +
-                            '\n'.join(new_includes) + '\n' +
-                            header_content[insert_pos:]
-                        )
+                    marker = externclasses_marker
+                    insert_pos = header_content.find(f"{marker}")
+                    if insert_pos == -1:
+                        marker = localheaders_marker
+                        insert_pos = header_content.find(f"{marker}")
+                        if insert_pos == -1:
+                            marker = convertor_marker
+                            insert_pos = header_content.find(f"{marker}")
+                            if insert_pos == -1:
+                                marker = ""
+                                header_guard_end = re.search(r'#define\s+\w+_H\s*\n', header_content)
+                                if header_guard_end:
+                                    insert_pos = header_guard_end.end()
+                                else:
+                                    logging.info("\t\tCannot find suitiblae insertion point")
+                                    return  
 
-                        # Write the updated content back to the header file
-                        with open(header_path, 'w') as f:
-                            f.write(updated_content)
+                    insert_pos += len(f"{marker}\n")
+                    updated_content = (
+                        header_content[:insert_pos] +
+                        '\n'.join(new_includes) + '\n' +
+                        header_content[insert_pos:]
+                    )
 
-                        logging.info(f"\tUpdated {short_header_path} with new includes:")
-                        for include in new_includes:
-                            logging.info(f"  - {include}")
-                    else:
-                        logging.warning(f"\tCould not find '{localheaders_marker}' in {short_header_path}")
+                    # Write the updated content back to the header file
+                    with open(header_path, 'w') as f:
+                        f.write(updated_content)
+
+                    logging.info(f"\tUpdated {short_header_path} with new includes:")
+                    for include in new_includes:
+                        logging.info(f"  - {include}")
                 else:
-                    logging.info(f"\tNo new includes needed for {short_header_path}")
+                    logging.warning(f"\tCould not find '{localheaders_marker}' in {short_header_path}")
             else:
-                logging.info(f"\tNo undefined functions found in {file} that need to be included")
+                logging.info(f"\tNo new includes needed for {short_header_path}")
+        else:
+            logging.info(f"\tNo undefined functions found in {file} that need to be included")
 
     logging.info("\tCompleted finding undefined functions and updating headers")
 
@@ -2125,20 +2203,22 @@ def main():
         logging.info("=======================================================================================================")
 
         for filename in os.listdir(glob_pio_src):
+            logging.info("")
             logging.debug(f"\tProcessing filename: {filename}")
             ino_name = os.path.basename(filename)
             logging.info(f"\t\tProcessing ino_file: {ino_name}")
             base_name = os.path.splitext(ino_name)[0]  # Get the basename without extension
-            logging.info(f"\t\t\tbase_name: {base_name}")
-            insert_class_instances_to_header_files(base_name)
+            logging.info(f"\t\t\tbase_name: {ino_name}")
+            insert_class_instances_to_header_files(filename)
 
-        logging.info("")
-        logging.info("=======================================================================================================")
-        logging.info(f"[Step 5] insert an #include for all '.h' files in {glob_project_name}.h")
-        logging.info("=======================================================================================================")
+        #logging.info("")
+        #logging.info("=======================================================================================================")
+        #logging.info(f"[Step 5] insert an #include for all '.h' files in {glob_project_name}.h")
+        #logging.info("=======================================================================================================")
 
-        for filename in os.listdir(glob_pio_src):
-            logging.debug(f"\tProcessing filename: {filename}")
+        #for filename in os.listdir(glob_pio_src):
+        #    logging.debug(f"\tProcessing filename: {filename}")
+
 
 
         logging.info("")
