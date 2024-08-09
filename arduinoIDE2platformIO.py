@@ -6,7 +6,7 @@
 #
 #   by        : Willem Aandewiel
 #
-#   Version   : v0.71 (07-08-2024)
+#   Version   : v0.72 (09-08-2024)
 #
 #------------------------------------------------------------
 import os
@@ -39,7 +39,7 @@ dict_known_classes = [
 
 # Dictionary of libraries and their associated objects
 dict_singleton_classes = {
-    "LittleFS.h": ["Dir", "FSinfo", "File", "FS", "LittleFS"],
+    "LittleFS.h": ["Dir", "FSInfo", "FSinfo", "File", "FS", "LittleFS"],
     "SPI.h":      ["SPI", "SPISettings", "SPIClass"],
     "Wire.h":     ["Wire", "TwoWire"],
     "IPAddress.h": ["IPAddress"]
@@ -588,6 +588,89 @@ def insert_include_in_header(header_lines, inserts):
 
     return header_lines
 
+#------------------------------------------------------------------------------------------------------
+def insert_method_include_in_header(header_file, include_statement):
+    try:
+        with open(header_file, 'r') as file:
+            content = file.readlines()
+        
+        # Find the appropriate position to insert the include statement
+        insert_position = 0
+        for i, line in enumerate(content):
+            if line.strip().startswith('#include'):
+                insert_position = i + 1
+            elif line.strip() == localheaders_marker:
+                insert_position = i + 1
+                break
+            elif line.strip().startswith('#ifndef') and line.strip().endswith('_H'):
+                insert_position = i + 2
+                break
+        
+        # Check if the include statement already exists
+        if include_statement not in content:
+            content.insert(insert_position, f"{include_statement}\t\t//-- added by instance.method()\n")
+        
+        with open(header_file, 'w') as file:
+            file.writelines(content)
+        
+        logging.info(f"Inserted include statement in {short_path(header_file)}: {include_statement}")
+    
+    
+    except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            line_number = exc_tb.tb_lineno
+            logging.error(f"\tAn error occurred at line {line_number}:\n {str(e)}")
+            exit()
+
+#------------------------------------------------------------------------------------------------------
+def extract_class_instances_by_methods(ino_file):
+    logging.info("")
+    logging.info(f"Processing extract_class_instances_by_methods() for file: [{ino_file}]")
+
+    try:
+        # Get the full path of the file under test and its header
+        src_file_path     = os.path.join(glob_pio_src, ino_file)
+        header_name       = os.path.splitext(ino_file)[0] + ".h"
+        header_file_path  = os.path.join(glob_pio_include, f"{header_name}")
+
+        class_instances = set()
+        pattern = r'\b(\w+)\s*\.\s*(\w+)'
+
+        #logging.info(f"Contents of dict_class_instances: {dict_class_instances}")
+
+        with open(src_file_path, 'r') as file:
+            for line_num, line in enumerate(file, 1):
+                logging.debug(f"Processing line {line_num}: {line.strip()}")
+                matches = re.findall(pattern, line)
+                logging.debug(f"Matches found on line {line_num}: {matches}")
+                
+                if matches:
+                    for instance, method in matches:
+                        logging.debug(f"Line {line_num}: Found potential class instance: {instance}, method: {method}")
+                        for file_path, class_list in dict_class_instances.items():
+                          if class_list:  # Only process for files that have classes
+                              for library, instance_name, constructor_args, fbase in class_list:
+                                  library_header = library + ".h"
+                                  if instance == instance_name:
+                                      class_instances.add((instance, library_header))
+                                      logging.info(f"Line {line_num}: Confirmed class instance: {instance}, Library: {library}")
+                                      break
+                                  else:
+                                      logging.debug(f"Line {line_num}: {instance} not found in dict_class_instances")
+
+        logging.info(f"Class instances found: {class_instances}")
+
+        for instance, library in class_instances:
+            insert_method_include_in_header(header_file_path, f"#include <{library}>")
+            #logging.info(f"Inserted include for {library} in {short_path(header_file_path)}")
+
+        logging.info(f"Completed processing {ino_file}, found {len(class_instances)} class instances")
+
+    except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            line_number = exc_tb.tb_lineno
+            logging.error(f"\tAn error occurred at line {line_number}:\n {str(e)}")
+            exit()
 
 #------------------------------------------------------------------------------------------------------
 def copy_data_folder():
@@ -837,6 +920,64 @@ def create_new_header_file(ino_name, header_name):
 
     logging.info(f"\tCreated new header file: {header_name}")
 
+#------------------------------------------------------------------------------------------------------
+def move_includes_from_ino_to_h(ino_name):
+    """Move includes from .ino file to .h file."""
+    logging.info("")
+    logging.info(f"Processing move_includes_from_ino_to_h(): {ino_name}")
+    
+    try:
+        ino_path = os.path.join(glob_pio_src, ino_name)
+        h_name = ino_name.replace(".ino", ".h")
+        h_path = os.path.join(glob_pio_include, h_name)
+        
+        # Read the .ino file
+        with open(ino_path, 'r') as ino_file:
+            ino_content = ino_file.readlines()
+        
+        # Read the .h file
+        with open(h_path, 'r') as h_file:
+            h_content = h_file.readlines()
+        
+        new_ino_content = []
+        includes_to_move = []
+        
+        # Process .ino file
+        for line in ino_content:
+            if line.strip().startswith("#include <"):
+                includes_to_move.append(line.strip())
+                logging.info(f"\t\tMoved include: {line.strip()}")
+                new_ino_content.append(f"//{line.strip()}\t//-- moved to .h\n")
+            else:
+                new_ino_content.append(line)
+        
+        # Find insertion point in .h file
+        insert_index = 0
+        for i, line in enumerate(h_content):
+            if line.strip().startswith("#include <"):
+                insert_index = i + 1
+            elif line.strip() == "#endif":
+                break
+        
+        # Insert includes in .h file
+        for include in includes_to_move:
+            logging.info(f"\t\tInserting include: {include}")
+            h_content.insert(insert_index, f"{include}\t//-- from ino file\n")
+            insert_index += 1
+        
+        # Write updated content back to files
+        with open(ino_path, 'w') as ino_file:
+            ino_file.writelines(new_ino_content)
+        
+        with open(h_path, 'w') as h_file:
+            h_file.writelines(h_content)
+        
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        line_number = exc_tb.tb_lineno
+        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
+        logging.error(f"\tError creating allDefines.h: {str(e)}")
+        exit()
 
 #------------------------------------------------------------------------------------------------------
 def process_original_header_file(header_path, base_name):
@@ -1507,13 +1648,25 @@ def extract_class_instances(file_path):
             if brace_level > 0:
                 continue
             
+            #logging.info(f"Processing line {line_num}: {stripped_line}")
             class_match = re.search(class_pattern, stripped_line)
             if class_match:
                 class_type = class_match.group(1).strip()
                 instance_name = class_match.group(2).strip()
                 constructor_args = class_match.group(3).strip() if class_match.group(3) else ""
+                logging.info(f"Match found on line {line_num}: {class_type} {instance_name}")
+                
                 # Check if it's a valid class type (starts with uppercase and is either in known_classes or matches the pattern)
                 if class_type[0].isupper() and (class_type in dict_known_classes or re.match(r'^[A-Z]\w+$', class_type)):
+                    # Check if the class is in dict_singleton_classes values
+                    is_singleton = any(class_type in classes for classes in dict_singleton_classes.values())
+                    if is_singleton:
+                        logging.info(f"{fbase}: Skipping {class_type} {instance_name} as it's in dict_singleton_classes")
+                        file_instances.append((header, "-", "=", fbase))
+                        included_headers.add(header)
+                        logging.info(f"{fbase}: Added include for singleton header {header}")
+                        #continue
+                    
                     # Check if the class is associated with a specific header in dict_singleton_classes
                     header_found = False
                     for header, classes in dict_singleton_classes.items():
@@ -1527,13 +1680,17 @@ def extract_class_instances(file_path):
                     
                     if not header_found:
                         file_instances.append((class_type, instance_name, constructor_args, fbase))
-                        logging.info(f"{fbase}: {class_type} {instance_name}")
+                        logging.info(f"{fbase}: Added {class_type} {instance_name}")
+                else:
+                    logging.info(f"Skipping invalid class type: {class_type}")
+            #else:
+            #    logging.info(f"No match found on line {line_num} {class_pattern}")
         
         # Check global dict_singleton_classes for objects
         for header, classes in dict_singleton_classes.items():
             for class_type in classes:
                 if class_type in content and header not in included_headers:
-                    logging.info(f"\t\tWhat do we have [{class_type}] [{header}]")
+                    logging.info(f"\t\tFound singleton class [{class_type}] in [{header}]")
                     file_instances.append((header, "-", "=", fbase))
                     included_headers.add(header)
                     logging.info(f"{fbase}: Added include for singleton header {header}")
@@ -1554,6 +1711,7 @@ def extract_class_instances(file_path):
         logging.info(f"\tExtracted class instances from {os.path.basename(file_path)} -> found: {len(file_instances)}")
 
     return class_instances
+
 
 #------------------------------------------------------------------------------------------------------
 def insert_class_instances_to_header_files(file_name):
@@ -2190,9 +2348,11 @@ def main():
             header_name = ino_name.replace(".ino", ".h")
             if filename.endswith(".ino"):
                 create_new_header_file(ino_name, header_name)
+                move_includes_from_ino_to_h(ino_name)
                 insert_prototypes(base_name)
                 insert_external_variables(base_name)
                 insert_local_includes(ino_name)
+                extract_class_instances_by_methods(ino_name)
 
         add_all_includes()
         

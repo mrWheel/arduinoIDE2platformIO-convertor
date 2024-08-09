@@ -119,7 +119,7 @@ struct tm timeinfo;
 bool      timeSynced = false;
 
 
-TimeSync        timeSync;
+TimeSyncClass        timeSync;
 
 const char *weekDayName[]  {  "Unknown", "Zondag", "Maandag", "Dinsdag", "Woensdag"
                             , "Donderdag", "Vrijdag", "Zaterdag", "Unknown" };

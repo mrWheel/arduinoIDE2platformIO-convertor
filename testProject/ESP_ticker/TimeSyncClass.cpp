@@ -4,7 +4,8 @@
 
 #include "TimeSyncClass.h"
 
-TimeSync::TimeSync() {}
+//aaw#TimeSync::TimeSync() {}
+TimeSyncClass::TimeSyncClass() {}
 
 /**
  * Sets up the time synchronization with the specified timezone.
@@ -15,7 +16,7 @@ TimeSync::TimeSync() {}
  *
  * @throws None
  */
-void TimeSync::setup(const char *timeZone)
+void TimeSyncClass::setup(const char *timeZone)
 {
   configTime(0, 0, "pool.ntp.org", "time.nist.gov",  "time.google.com");
   setenv("TZ", timeZone, 1);
@@ -31,7 +32,7 @@ void TimeSync::setup(const char *timeZone)
  *
  * @throws None
  */
-bool TimeSync::isSynced()
+bool TimeSyncClass::isSynced()
 {
   time_t now;
   time(&now);
@@ -49,7 +50,7 @@ bool TimeSync::isSynced()
  *
  * @throws None
  */
-bool TimeSync::sync(uint16_t maxTry)
+bool TimeSyncClass::sync(uint16_t maxTry)
 {
   time_t now;
   time(&now);
@@ -82,7 +83,7 @@ bool TimeSync::sync(uint16_t maxTry)
  *
  * @throws None
  */
-void TimeSync::logTime()
+void TimeSyncClass::logTime()
 {
   time_t now;
   time(&now);

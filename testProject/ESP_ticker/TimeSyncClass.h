@@ -4,10 +4,10 @@
 
 #include <Arduino.h>
 
-class TimeSync 
+class TimeSyncClass 
 {
     public:
-        TimeSync();
+        TimeSyncClass();
         void setup(const char *timeZone = "CET-1CEST,M3.5.0,M10.5.0/3");
         bool sync(uint16_t maxTry);
         bool isSynced();
