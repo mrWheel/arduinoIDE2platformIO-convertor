@@ -326,7 +326,7 @@ void setup()
 
   time(&now);
   Serial.println("-------------------------------------------------------------------------------");
-  if (!getTheLocalTime(&timeinfo, 10000))
+  if (!getTheLocalTime(timeinfo, 10000))
   {
     Debugln("Time       : Failed to obtain time!");
   }

@@ -115,7 +115,7 @@ uint8_t   settingNewsInterval, settingNewsMaxMsg;
 bool      LittleFSmounted = false;
 FSInfo    LittleFSinfo;
 time_t    now; 
-struct tm timeinfo;
+struct tm* timeinfo;
 bool      timeSynced = false;
 
 
