@@ -4,7 +4,7 @@ A 'news' ticker with esp8266 and *MAX7219 Dot matrix modules*
 based on [**this post**](https://willem.aandewiel.nl/index.php/2020/06/09/an-esp8266-ticker/)
 <p>Firmware by Willem Aandewiel
 
-## uses:
+## libraries used:
 <pre>
 tzapu/WiFiManager @ 0.16.0
 majicdesigns/MD_Parola @ 3.7.3
@@ -51,7 +51,4 @@ lib_deps =
 
 monitor_filters = 
 	esp8266_exception_decoder
-<pre>
-
-
-
+</pre>

@@ -1,16 +1,15 @@
-# rotaryPulserInt
-rotaryPulser based on ATmega328 using Timer1 interrupt
+# pulseGenerator
+***pulsGenerator*** based on ATmega328 using Timer1 interrupt
 <p>Firmware by Willem Aandewiel
 
-## uses:
+## libraries used:
 <pre>
 https://github.com/Chris--A/Keypad
 https://github.com/fdebrabander/Arduino-LiquidCrystal-I2C-library
 </pre>
 
 ## platformio.ini
-
-```
+<pre>
   ; PlatformIO Project Configuration File
   ;
   ;   Build options: build flags, source filter
@@ -32,7 +31,7 @@ https://github.com/fdebrabander/Arduino-LiquidCrystal-I2C-library
   framework       = arduino
   monitor_speed   = 19200
   upload_speed    = 19200
-  upload_port     = #<select port like "/dev/cu.usbserial-3224144">
+  upload_port     = #select port like "/dev/cu.usbserial-3224144"
   build_flags     = 
 	          -D DEBUG
   lib_ldf_mode    = deep+
@@ -41,7 +40,7 @@ https://github.com/fdebrabander/Arduino-LiquidCrystal-I2C-library
 	          chris--a/Keypad@^3.1.1
             
   monitor_filters =
-```
+</pre>
 
 ## Optinal compile options
 <code>#define _ALTERNATIVE_CONNECTIONS</code> for alternative connections
