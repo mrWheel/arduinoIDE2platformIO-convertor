@@ -6,7 +6,7 @@
 #
 #   by        : Willem Aandewiel
 #
-#   Version   : v0.75 (11-08-2024)
+#   Version   : v0.77 (12-08-2024)
 #
 #------------------------------------------------------------
 import os
@@ -96,11 +96,11 @@ def backup_project():
 #------------------------------------------------------------------------------------------------------
 def print_dict(dict):
       keys = list(dict.keys())
-      print(f"Keys: {keys}")
+      logging.info(f"Keys: {keys}")
       # Iterate over keys and values
-      print("Iterating over keys and values:")
+      logging.info("Iterating over keys and values:")
       for key, value in dict_global_variables.items():
-          print(f"  key[{key}]: value[{value}]")
+          logging.info(f"  key[{key}]: value[{value}]")
 
 #------------------------------------------------------------------------------------------------------
 def set_glob_project_info(project_dir):
@@ -110,6 +110,8 @@ def set_glob_project_info(project_dir):
     Returns:
         tuple: Contains project_folder, glob_project_name, glob_pio_folder, glob_pio_src, glob_pio_include
     """
+    logging.info("")
+    logging.info(f"Processing: set_glob_project_info({os.path.basename(project_dir)})")
     global glob_ino_project_folder
     global glob_pio_project_folder
     global glob_working_dir
@@ -120,20 +122,20 @@ def set_glob_project_info(project_dir):
     global glob_pio_include
 
     glob_ino_project_folder = os.path.abspath(glob_working_dir)
-    glob_project_name = os.path.basename(glob_ino_project_folder)
-    glob_pio_folder = os.path.join(glob_ino_project_folder, "PlatformIO")
+    glob_project_name       = os.path.basename(glob_ino_project_folder)
+    glob_pio_folder         = os.path.join(glob_ino_project_folder, "PlatformIO")
     glob_pio_project_folder = os.path.join(glob_pio_folder, glob_project_name)
-    glob_pio_src = os.path.join(glob_pio_folder, glob_project_name, "src")
-    glob_pio_include = os.path.join(glob_pio_folder, glob_project_name, "include")
+    glob_pio_src            = os.path.join(glob_pio_folder, glob_project_name, "src")
+    glob_pio_include        = os.path.join(glob_pio_folder, glob_project_name, "include")
 
-    logging.info(f"glob_ino_project_folder: {glob_ino_project_folder}")
-    logging.info(f"glob_pio_project_folder: {glob_pio_project_folder}")
-    logging.info(f"      glob_project_name: {glob_project_name}")
-    logging.info(f"        glob_pio_folder: {glob_pio_folder}")
-    logging.info(f"           glob_pio_src: {glob_pio_src}")
-    logging.info(f"       glob_pio_include: {glob_pio_include}\n")
+    logging.debug(f"glob_ino_project_folder: {glob_ino_project_folder}")
+    logging.debug(f"glob_pio_project_folder: {glob_pio_project_folder}")
+    logging.debug(f"      glob_project_name: {glob_project_name}")
+    logging.debug(f"        glob_pio_folder: {glob_pio_folder}")
+    logging.debug(f"           glob_pio_src: {glob_pio_src}")
+    logging.debug(f"       glob_pio_include: {glob_pio_include}\n")
 
-    #return glob_ino_project_folder, glob_project_name, glob_pio_folder, glob_pio_src, glob_pio_include
+    return
 
 #------------------------------------------------------------------------------------------------------
 def extract_word_by_position(s, word_number, separator):
@@ -258,18 +260,16 @@ def print_global_vars(global_vars):
         sorted_global_vars = sort_global_vars(global_vars)
 
         if (len(sorted_global_vars) > 0):
-            print("--- Global Variables ---")
+            logging.info("")
+            logging.info("--- Global Variables ---")
         for file_path, vars_list in sorted_global_vars.items():
             if vars_list:  # Only print for files that have global variables
-                #print(f"\nFile: {file_path}")
                 for var_type, var_name, function, is_pointer in vars_list:
                     pointer_str = "*" if is_pointer else " "
                     function_str = function if function else "global scope"
-                    #var_type_pointer = f"{var_type}{pointer_str}"
-                    #print(f"       {var_type:<15} {pointer_str:<1} {var_name:<35} {function_str:<20} (in {file_path})")
-                    print(f"       {var_type:<15} {var_name:<35} {function_str:<20} (in {file_path})")
+                    logging.info(f"       {var_type:<15} {var_name:<35} {function_str:<20} (in {file_path})")
         
-        print("")
+        logging.info("")
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -305,13 +305,14 @@ def print_global_vars_undefined(global_vars_undefined):
     """
     try:
         if (len(global_vars_undefined) > 0):
-            print("\n--- Undefined Global Variables ---")
+            logging.info("")
+            logging.info("--- Undefined Global Variables ---")
         for key, info in sorted(global_vars_undefined.items(), key=lambda x: (x[1]['var_name'], x[1]['used_in'], x[1]['line'])):
             pointer_str = "*" if info['var_is_pointer'] else ""
             var_type_pointer = f"{info['var_type']}{pointer_str}"
-            print(f"  - {var_type_pointer:<15.15} {info['var_name']:<30} (line {info['line']:<4}  in {info['used_in'][:20]:<20}) [{var_type_pointer:<25.25}] (defined in {info['defined_in']})")
+            logging.info(f"  - {var_type_pointer:<15.15} {info['var_name']:<30} (line {info['line']:<4}  in {info['used_in'][:20]:<20}) [{var_type_pointer:<25.25}] (defined in {info['defined_in']})")
 
-        print("")
+        logging.info("")
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -332,13 +333,14 @@ def print_prototypes(functions_dict):
           logging.info("\tNo functions found.")
           return
 
-      print("\n--- Function Prototypes ---")
+      logging.info("")
+      logging.info("--- Function Prototypes ---")
       for key, value in functions_dict.items():
           func_name, params = key
           prototype, file_name, bare_func_name = value
-          print(f"{file_name:<25}  {bare_func_name:<30} {prototype}")
+          logging.info(f"{file_name:<25}  {bare_func_name:<30} {prototype}")
 
-      print("")
+      logging.info("")
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -354,14 +356,15 @@ def print_class_instances(class_instances):
         if not any(vars_list for vars_list in class_instances.values()):
             return
 
-        print("\n--- Class Instances ---")
+        logging.info("")
+        logging.info("--- Class Instances ---")
         for file_path, class_list in class_instances.items():
             if class_list:  # Only print for files that have classes
                 for class_type, instance_name, constructor_args, fbase in class_list:
                     parentacedConstructor = "("+constructor_args+")"
-                    print(f"       {class_type:<25} {instance_name:<25} {parentacedConstructor:<15} (in {fbase})")
+                    logging.info(f"       {class_type:<25} {instance_name:<25} {parentacedConstructor:<15} (in {fbase})")
         
-        print("")
+        logging.info("")
                                     
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -381,10 +384,11 @@ def print_includes(includes):
         if len(includes) == 0:
             return
 
-        print("\n--- Include Statements ---")
+        logging.info("")
+        logging.info("--- Include Statements ---")
         for include in includes:
-            print(f"  {include}")
-        print("")
+            logging.info(f"  {include}")
+        logging.info("")
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -436,7 +440,7 @@ def list_files_in_directory(directory_path):
 
 #------------------------------------------------------------------------------------------------------
 def rename_file(old_name, new_name):
-    print("")
+    logging.info("")
     logging.info(f"rename_file(): {short_path(old_name)} -> {short_path(new_name)}")
 
     # Check if the paths exist
@@ -458,7 +462,7 @@ def rename_file(old_name, new_name):
 
 #------------------------------------------------------------------------------------------------------
 def remove_pio_tree(preserve_file):
-    print("")
+    logging.info("")
     logging.info(f"remove_pio_tree(): {short_path(glob_pio_folder)}, project:[{glob_project_name}], preserve:[{preserve_file}]")
     # Construct the full path
     #full_path = os.path.join(glob_pio_folder, glob_project_name)
@@ -518,8 +522,6 @@ def remove_pio_tree(preserve_file):
             if preserve_file_contents is not None:
                 f.write(preserve_file_contents)
         
-        #print(f"Successfully removed all contents in {full_path} including the folder itself, "
-        #      f"and all other contents in {base_path} except {preserve_file}")
         logging.info(f"\tSuccessfully removed all contents in [{short_path(glob_pio_folder)}]")
         logging.info(f"\tand all other contents in [{short_path(glob_pio_folder)}] except [{preserve_file}]")
     
@@ -533,32 +535,32 @@ def remove_pio_tree(preserve_file):
 #------------------------------------------------------------------------------------------------------
 def recreate_pio_folders():
     """Create or recreate PlatformIO folder structure."""
+
+    logging.info("")
+    logging.info("Processing: recreat_pio_folders()")
+
     # Ensure the main PlatformIO folder exists
     if not os.path.exists(glob_pio_folder):
         os.makedirs(glob_pio_folder)
-        logging.info(f"Created PlatformIO folder: {short_path(glob_pio_folder)}")
-    logging.info(f"Recreating PlatformIO folder structure: {glob_pio_folder}")
-
-    #last_folder = "ESP_ticker"
-    #file_to_preserve = "platformio.ini"
+        logging.debug(f"\tCreated PlatformIO folder: {short_path(glob_pio_folder)}")
 
     # Get the current working directory
     current_dir = os.getcwd()
-    logging.info(f"\tCurrent working directory: {current_dir}")
+    logging.debug(f"\tCurrent working directory: {current_dir}")
 
     # Construct the full base path
     full_base_path = os.path.join(current_dir, glob_pio_folder, glob_project_name)
-    logging.info(f"\t  Full base path: {full_base_path}")
-    logging.info(f"\t    glob_pio_src: {glob_pio_src}")
-    logging.info(f"\tglob_pio_include: {glob_pio_include}")
+    logging.debug(f"\t  Full base path: {full_base_path}")
+    logging.debug(f"\t    glob_pio_src: {glob_pio_src}")
+    logging.debug(f"\tglob_pio_include: {glob_pio_include}")
 
     # Recreate src and include folders
     for folder in [glob_pio_src, glob_pio_include]:
         if os.path.exists(folder):
             shutil.rmtree(folder)
-        logging.info(f"\tmakedirs [{folder}]")
+        logging.debug(f"\tmakedirs [{folder}]")
         os.makedirs(folder)
-        logging.info(f"\tRecreated folder: [{folder}]")
+        logging.debug(f"\tRecreated folder: [{folder}]")
 
     logging.info("\tPlatformIO folder structure recreated")
 
@@ -568,7 +570,7 @@ def insert_include_in_header(header_lines, inserts):
     Insert #include statements in the header file.
     """
     logging("")
-    logging.info("Processing insert_include_in_header() ..")
+    logging.info("Processing: insert_include_in_header() ..")
 
     includes_to_add = []
     includes_added = set()
@@ -590,17 +592,17 @@ def insert_include_in_header(header_lines, inserts):
             if singleton_header not in includes_added:
                 includes_to_add.append(f'#include <{singleton_header}>\t\t//-- singleton')
                 includes_added.add(singleton_header)
-                logging.info(f"\t\tAdding #{class_name} via <{singleton_header}>")
+                logging.debug(f"\t\tAdding #{class_name} via <{singleton_header}>")
         elif class_name.endswith('.h'):
             if class_name not in includes_added:
                 includes_to_add.append(f'#include <{class_name}>')
                 includes_added.add(class_name)
-                logging.info(f"\t\tAdding <{class_name}>")
+                logging.debug(f"\t\tAdding <{class_name}>")
         else:
             if class_name not in includes_added:
                 includes_to_add.append(f'#include <{class_name}.h>')
                 includes_added.add(class_name)
-                logging.info(f"\t\tAdding <{class_name}.h>")
+                logging.debug(f"\t\tAdding <{class_name}.h>")
 
     # Find the position to insert the new includes
     insert_position = 0
@@ -619,6 +621,8 @@ def insert_include_in_header(header_lines, inserts):
 
 #------------------------------------------------------------------------------------------------------
 def insert_method_include_in_header(header_file, include_statement):
+    logging.info("")
+    logging.info("Processing: insert_method_include_in_header() ..")
     try:
         with open(header_file, 'r') as file:
             content = file.readlines()
@@ -661,9 +665,9 @@ def insert_method_include_in_header(header_file, include_statement):
         
         if not include_exists:
             content.insert(insert_position, f"{include_statement}\t\t//-- added by instance.method()\n")
-            logging.info(f"Inserted include statement in {short_path(header_file)}: {include_statement}")
+            logging.debug(f"\tInserted include statement in {short_path(header_file)}: {include_statement}")
         else:
-            logging.info(f"Include statement already exists in {short_path(header_file)}: {include_statement}")
+            logging.debug(f"\tInclude statement already exists in {short_path(header_file)}: {include_statement}")
         
         with open(header_file, 'w') as file:
             file.writelines(content)
@@ -674,55 +678,6 @@ def insert_method_include_in_header(header_file, include_statement):
         logging.error(f"\tAn error occurred at line {line_number}:\n {str(e)}")
         exit()
 
-#------------------------------------------------------------------------------------------------------
-def extract_class_instances_by_methods(ino_file):
-    print("")
-    logging.info(f"Processing extract_class_instances_by_methods() for file: [{ino_file}]")
-
-    try:
-        # Get the full path of the file under test and its header
-        src_file_path     = os.path.join(glob_pio_src, ino_file)
-        header_name       = os.path.splitext(ino_file)[0] + ".h"
-        header_file_path  = os.path.join(glob_pio_include, f"{header_name}")
-
-        class_instances = set()
-        pattern = r'\b(\w+)\s*\.\s*(\w+)'
-
-        #logging.info(f"Contents of dict_class_instances: {dict_class_instances}")
-
-        with open(src_file_path, 'r') as file:
-            for line_num, line in enumerate(file, 1):
-                logging.debug(f"Processing line {line_num}: {line.strip()}")
-                matches = re.findall(pattern, line)
-                logging.debug(f"Matches found on line {line_num}: {matches}")
-                
-                if matches:
-                    for instance, method in matches:
-                        logging.debug(f"Line {line_num}: Found potential class instance: {instance}, method: {method}")
-                        for file_path, class_list in dict_class_instances.items():
-                          if class_list:  # Only process for files that have classes
-                              for library, instance_name, constructor_args, fbase in class_list:
-                                  library_header = library + ".h"
-                                  if instance == instance_name:
-                                      class_instances.add((instance, library_header))
-                                      #logging.info(f"Line {line_num}: Confirmed class instance: {instance}, Library: {library}")
-                                      break
-                                  else:
-                                      logging.debug(f"Line {line_num}: {instance} not found in dict_class_instances")
-
-        logging.info(f"Class instances found: {class_instances}")
-
-        #for instance, library in class_instances:
-        #    insert_method_include_in_header(header_file_path, f"#include <{library}>")
-        #    #logging.info(f"Inserted include for {library} in {short_path(header_file_path)}")
-
-        logging.info(f"Completed processing {ino_file}, found {len(class_instances)} class instances")
-
-    except Exception as e:
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            line_number = exc_tb.tb_lineno
-            logging.error(f"\tAn error occurred at line {line_number}:\n {str(e)}")
-            exit()
 
 #------------------------------------------------------------------------------------------------------
 def copy_data_folder():
@@ -730,7 +685,9 @@ def copy_data_folder():
     Delete existing data folder in glob_pio_folder if it exists,
     then copy the data folder from the project folder to the PlatformIO folder if it exists.
     """
-    print("");
+    logging.info("")
+    logging.info("Processing: copy_data_folder()")
+
     source_data_folder = os.path.join(glob_ino_project_folder, 'data')
     destination_data_folder = os.path.join(glob_pio_folder, glob_project_name, 'data')
 
@@ -738,7 +695,7 @@ def copy_data_folder():
     if os.path.exists(destination_data_folder):
         try:
             shutil.rmtree(destination_data_folder)
-            logging.info(f"\tDeleted existing data folder in {short_path(glob_pio_folder)}")
+            logging.debug(f"\tDeleted existing data folder in {short_path(glob_pio_folder)}")
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -751,11 +708,11 @@ def copy_data_folder():
     # Copy data folder from project folder to glob_pio_folder if it exists
     if os.path.exists(source_data_folder):
         try:
-            logging.info("\tCopy data folder ")
-            logging.info(f"\t>> from: {short_path(source_data_folder)}")
-            logging.info(f"\t>>   to: {short_path(destination_data_folder)}")
+            logging.debug("\tCopy data folder ")
+            logging.debug(f"\t>> from: {short_path(source_data_folder)}")
+            logging.debug(f"\t>>   to: {short_path(destination_data_folder)}")
             shutil.copytree(source_data_folder, destination_data_folder)
-            logging.info(f"\tCopied data folder from {short_path(source_data_folder)} to {short_path(destination_data_folder)}")
+            logging.debug(f"\tCopied data folder from {short_path(source_data_folder)} to {short_path(destination_data_folder)}")
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -770,8 +727,9 @@ def copy_data_folder():
 #------------------------------------------------------------------------------------------------------
 def create_platformio_ini():
     """Create a platformio.ini file if it doesn't exist."""
-    print("")
-    logging.info(f"Processing create _platformio_ini() if it doesn't exist in [{short_path(glob_pio_project_folder)}]")
+    logging.info("")
+    logging.info(f"Processing: create _platformio_ini() if it doesn't exist in [{short_path(glob_pio_project_folder)}]")
+
     platformio_ini_path = os.path.join(glob_pio_project_folder, 'platformio.ini')
     if not os.path.exists(platformio_ini_path):
         platformio_ini_content = """
@@ -793,13 +751,20 @@ default_envs = myBoard
 ;-- esp32
 #platform = espressif32
 #board = esp32dev
+##-- you NEED the next line (with the correct port)
+##-- or the data upload will NOT work!
+#upload_port = /dev/serial_port
 #board_build.partitions = min_spiffs.csv
 #board_build.filesystem = SPIFFS
 
 ;-- esp8266
 #platform = espressif8266
 #board = esp12e
-#board_build.filesystem = LittleFS
+##-- you NEED the next line (with the correct port)
+##-- or the data upload will NOT work!
+#upload_port = /dev/serial_port
+
+#board_build.filesystem = littlefs
 
 ;-- attiny85
 #platform = atmelavr
@@ -848,7 +813,7 @@ def extract_and_comment_defines():
     Extract all #define statements (including functional and multi-line) from .h, .ino, and .cpp files,
     create arduinoGlue.h, and comment original statements with info.
     """
-    print("")
+    logging.info("")
     all_defines = []
     define_pattern = r'^\s*#define\s+(\w+)(?:\(.*?\))?\s*(.*?)(?:(?=\\\n)|$)'
 
@@ -863,7 +828,7 @@ def extract_and_comment_defines():
             for file in files:
                 if file.endswith(('.h', '.ino')):
                     file_path = os.path.join(root, file)
-                    logging.info(f"\tProcessing file: {short_path(file_path)}")
+                    logging.debug(f"\tProcessing file: {short_path(file_path)}")
                     try:
                         with open(file_path, 'r') as f:
                             content = f.read()
@@ -945,8 +910,8 @@ def extract_and_comment_defines():
 
 #------------------------------------------------------------------------------------------------------
 def add_markers_to_header_file(file_path):
-    print("")
-    logging.info(f"Processing add_markers_to_header_file() from: {short_path(file_path)}")
+    logging.info("")
+    logging.info(f"Processing: add_markers_to_header_file() from: {short_path(file_path)}")
 
     try:
         with open(file_path, 'r') as file:
@@ -1019,8 +984,8 @@ def add_markers_to_header_file(file_path):
 #------------------------------------------------------------------------------------------------------
 def create_new_header_file(ino_name, header_name):
     """Create new header file with basic structure."""
-    print("")
-    logging.info(f"Processing create_new_header_file(): {header_name} for [{ino_name}]")
+    logging.info("")
+    logging.info(f"Processing: create_new_header_file(): {header_name} for [{ino_name}]")
 
     header_path = os.path.join(glob_pio_include, f"{header_name}")
 
@@ -1035,18 +1000,11 @@ def create_new_header_file(ino_name, header_name):
         with open(header_path, 'w') as f:
             f.write(f"#ifndef {base_name.upper()}_H\n")
             f.write(f"#define {base_name.upper()}_H\n\n")
-            #f.write(f"{existingincludes_marker}")
-            #f.write("\n\n")
-            #f.write("#include <Arduino.h>\n\n")
             f.write(f"{localincludes_marker}")
             f.write("\n")
             f.write("#include \"arduinoGlue.h\"\n\n")
             f.write(f"{convertor_marker}")
             f.write("\n")
-            #f.write(f"{externvariables_marker}")
-            #f.write("\n\n")
-            #f.write(f"{prototypes_marker}")
-            #f.write("\n\n")
             f.write(f"#endif // {base_name.upper()}_H\n")
         
     except Exception as e:
@@ -1058,88 +1016,10 @@ def create_new_header_file(ino_name, header_name):
 
     logging.info(f"\tCreated new header file: {header_name}")
 
-#------------------------------------------------------------------------------------------------------
-def move_includes_from_ino_to_h(ino_name):
-    """Move includes from .ino file to .h file."""
-    print("")
-    logging.info(f"Processing move_includes_from_ino_to_h(): {ino_name}")
-    
-    try:
-        ino_path  = os.path.join(glob_pio_src, ino_name)
-        h_name    = ino_name.replace(".ino", ".h")
-        h_path    = os.path.join(glob_pio_include, h_name)
-        
-        # Read the .ino file
-        with open(ino_path, 'r') as ino_file:
-            ino_content = ino_file.read()
-        
-        # Read the .h file
-        with open(h_path, 'r') as h_file:
-            h_content = h_file.read()
-
-        #logging.info(f"Original Header {h_path}")
-        #print(h_content)
-        #print("")
-        
-        new_ino_content = []
-        includes_to_move = []
-        
-        # Process .ino file
-        for line in ino_content.split('\n'):
-            if line.strip().startswith("#include <"):
-                includes_to_move.append(line.strip())
-                logging.info(f"\t\tMoved include: {line.strip()}")
-                new_ino_content.append(f"//{line.strip()}\t//-- moved to .h")
-            else:
-                new_ino_content.append(line)
-        
-        # Find insertion point in .h file
-        existingincludes_index  = h_content.find(existingincludes_marker)
-        convertor_index         = h_content.find(convertor_marker)
-        header_guard_index      = h_content.find(f"#define {h_name.upper().replace('.', '_')}_H")
-        
-        existing_includes = set(re.findall(r'#include\s+<[^>]+>', h_content))
-        logging.info(f"EXISTING INCLUDES:\n{existing_includes}\n")
-
-        if existingincludes_index != -1:
-            insert_index = h_content.find('\n', existingincludes_index) + 1
-        elif convertor_index != -1:
-            insert_index = h_content.find('\n', convertor_index) + 1
-        elif header_guard_index != -1:
-            insert_index = h_content.find('\n', header_guard_index)
-            insert_index = h_content.find('\n', insert_index + 1) + 1  # Skip one line after header guard
-        else:
-            insert_index = 0
-
-        # Insert includes in .h file
-        new_includes = []
-        for include in includes_to_move:
-            if include not in existing_includes:
-                logging.info(f"\t\tInserting include: {include} @ {insert_index}")
-                new_includes.append(f"{include}\t//-- from ino file")
-                existing_includes.add(include)
-            else:
-                logging.info(f"\t\tSkipping duplicate include: {include}")
-        
-        h_content = h_content[:insert_index] + '\n'.join(new_includes) + '\n' + h_content[insert_index:]
-        
-        # Write updated content back to files
-        with open(ino_path, 'w') as ino_file:
-            ino_file.write('\n'.join(new_ino_content))
-        
-        with open(h_path, 'w') as h_file:
-            h_file.write(h_content)
-        
-    except Exception as e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        line_number = exc_tb.tb_lineno
-        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
-        logging.error(f"\tError in move_includes_from_ino_to_h: {str(e)}")
-        exit()
 
 #------------------------------------------------------------------------------------------------------
 def process_original_header_file(header_path, base_name):
-    logging.info(f"Processing process_original_header_file(): [{base_name}]")
+    logging.info(f"Processing: process_original_header_file(): [{base_name}]")
     
     if os.path.exists(header_path):
         with open(header_path, 'r') as f:
@@ -1153,7 +1033,7 @@ def process_original_header_file(header_path, base_name):
 
         if not has_guards:
             # Add header guards if they don't exist
-            logging.info(f"\tAdding header guards for {base_name}")
+            logging.debug(f"\tAdding header guards for {base_name}")
             guard_name = f"{base_name.upper()}_H"
             new_content = f"#ifndef {guard_name}\n#define {guard_name}\n\n{new_content}\n#endif // {guard_name}\n"
         else:
@@ -1161,7 +1041,7 @@ def process_original_header_file(header_path, base_name):
 
         # Find the position to insert the localincludes_marker
         if localincludes_marker not in new_content:
-            logging.info(f"\tAdding {localincludes_marker} to {base_name}")
+            logging.debug(f"\tAdding {localincludes_marker} to {base_name}")
             # Find the first closing comment after the header guard
             comment_end = new_content.find('*/', new_content.find(guard_name)) + 2
             if comment_end > 1:  # If a closing comment was found
@@ -1173,232 +1053,23 @@ def process_original_header_file(header_path, base_name):
 
         # Check if arduinoGlue.h is already included
         if '#include "arduinoGlue.h"' not in new_content:
-            logging.info(f"\tAdding arduinoGlue.h include to {base_name}")
+            logging.debug(f"\tAdding arduinoGlue.h include to {base_name}")
             # Insert after the convertor_marker
-            #aaw#insert_pos = new_content.find('\n', new_content.find(convertor_marker)) + 1
             insert_pos = new_content.find('\n', new_content.find(localincludes_marker)) + 1
             new_content = new_content[:insert_pos] + '#include "arduinoGlue.h"\n\n' + new_content[insert_pos:]
-
-        #logging.info("=== new_content ===")
-        #print(new_content)
 
         # Only write to the file if changes were made
         if new_content != original_content:
             with open(header_path, 'w') as f:
                 f.write(new_content)
-            logging.info(f"\tUpdated original header file: {short_path(header_path)}")
+            logging.debug(f"\tUpdated original header file: {short_path(header_path)}")
         else:
-            logging.info(f"\tNo changes needed for: {short_path(header_path)}")
+            logging.debug(f"\tNo changes needed for: {short_path(header_path)}")
     else:
-        logging.info(f"\tFile not found: {short_path(header_path)}")
+        logging.debug(f"\tFile not found: {short_path(header_path)}")
 
     return header_path
 
-#------------------------------------------------------------------------------------------------------
-def insert_external_variables(base_name):
-    print("")
-    logging.info(f"Processing insert_external_variables() in file: [{os.path.splitext(base_name)[0]}]")
-    
-    # Get the full path of the file under test
-    base_used_in  = os.path.splitext(base_name)[0]
-    header_name   = base_used_in + ".h"
-    header_path   = os.path.join(glob_pio_include, header_name)
-    
-    try:
-        # Select undefined variables used in the file under test
-        selected_vars = []
-        for var_name, info in dict_undefined_vars_used.items():
-            #logging.info(f"\tChecking: [{info['var_type']:<10}\t {var_name:<30}]\t (Used in {info['used_in']}), \tDefined in [{info['defined_in']}]")
-            if info['used_in'] == base_used_in and info['defined_in'] != base_used_in:
-                logging.info(f"\tfound: {info['var_type']:<10} \t{info['var_name']:<30} (defined in {info['defined_in']})")
-                var_name_base = info['var_name']
-                var_type = info['var_type']
-                defined_in = info['defined_in']
-                selected_vars.append((var_type, var_name_base, defined_in))
-        
-        if not selected_vars:
-            logging.info(f"\tNo undefined variables found for {base_name}")
-            return
-        
-        # Read the content of the file under test
-        with open(header_path, 'r') as file:
-            file_content = file.read()
-        
-        # Find the position of the externvariables_marker
-        marker = externvariables_marker
-        marker_pos = file_content.find(marker)
-        if marker_pos == -1:
-            logging.info(f"\tExternvariables marker not found in {base_name}")
-            marker = convertor_marker
-            marker_pos = file_content.find(marker)
-            if marker_pos == -1:
-                logging.info(f"\tConvertor marker not found in {base_name}")
-                return
-        
-        # Insert the external variable declarations after the marker
-        insert_pos = marker_pos + len(marker) + 1  # +1 for the newline
-        extern_vars_text = "\n".join(f"extern {var_type:<10} {var_name_base+';':<30} \t//-- from {defined_in}" for var_type, var_name_base, defined_in in selected_vars) + "\n"
-        
-        new_content = (
-            file_content[:insert_pos] +
-            extern_vars_text +
-            file_content[insert_pos:]
-        )
-        
-        # Write the modified content back to the file under test
-        with open(header_path, 'w') as file:
-            file.write(new_content)
-
-    except Exception as e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        line_number = exc_tb.tb_lineno
-        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
-        logging.error(f"\tError processing file {header_path}: {str(e)}")
-        exit()
-    
-    logging.info(f"\tInserted {len(selected_vars)} external variable declarations into {base_name}")
-
-#------------------------------------------------------------------------------------------------------
-def insert_prototypes(base_name):
-    print("")
-    logging.info(f"Processing insert_prototypes() in file: [{base_name}]")
-    
-    # Get the full path of the file under test
-    header_name = os.path.splitext(base_name)[0] + ".h"
-    file_path = os.path.join(glob_pio_include, header_name)
-    
-    try:
-        # Select prototypes from the file under test and ensure they end with a semicolon
-        selected_prototypes = [
-            (prototype + ';' if not prototype.strip().endswith(';') else prototype)
-            for (func_name, params), (prototype, src_file_path, _) in dict_prototypes.items()
-            if os.path.basename(os.path.splitext(src_file_path)[0]) == os.path.basename(os.path.splitext(base_name)[0])
-        ]
-        
-        # Read the content of the file under test
-        with open(file_path, 'r') as file:
-            file_content = file.read()
-        
-        # Find the position of the prototype_marker
-        marker = prototypes_marker
-        marker_pos = file_content.find(marker)
-        if marker_pos == -1:
-            logging.info(f"\tPrototype marker not found in {base_name}")
-            marker = convertor_marker
-            marker_pos = file_content.find(marker)
-            if marker_pos == -1:
-                logging.info(f"\tConvertor marker not found in {base_name}")
-                return
-        
-        # Insert the prototypes after the marker
-        insert_pos = marker_pos + len(marker) + 1  # +1 for the newline
-        prototypes_text = "\n".join(selected_prototypes) + "\n"
-        
-        new_content = (
-            file_content[:insert_pos] +
-            prototypes_text +
-            file_content[insert_pos:]
-        )
-        
-        # Write the modified content back to the file under test
-        with open(file_path, 'w') as file:
-            file.write(new_content)
-
-    except Exception as e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        line_number = exc_tb.tb_lineno
-        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
-        logging.error(f"\tError processing file {file_path}: {str(e)}")
-        exit()
-
-    logging.info(f"\tInserted {len(selected_prototypes)} prototypes into {base_name}")
-
-#------------------------------------------------------------------------------------------------------
-def insert_local_includes(base_name):
-    global args, dict_prototypes
-
-    print("")
-    logging.info(f"Processing insert_local_includes() for file: [{base_name}]")
-    
-    # Get the full path of the file under test and its header
-    src_file_path = os.path.join(glob_pio_src, base_name)
-    header_name = os.path.splitext(base_name)[0] + ".h"
-    header_file_path = os.path.join(glob_pio_include, f"{header_name}")
-    
-    try:
-        # Read the content of the source file
-        with open(src_file_path, 'r') as file:
-            src_content = file.read()
-        
-        # Extract all words from the source file
-        words = set(re.findall(r'\b\w+\b', src_content))
-        
-        if args.debug:
-            print(f"Words found in {base_name}: {', '.join(sorted(words))}")
-        
-        # Read the content of the header file
-        with open(header_file_path, 'r') as file:
-            header_content = file.read()
-        
-        # Find existing includes
-        existing_includes = set(re.findall(r'#include\s*"([^"]+)"', header_content))
-        
-        # Collect includes for functions found in dict_prototypes
-        includes = {}
-        for word in words:
-            for (func_name, _), (prototype, file_path, bare_func_name) in dict_prototypes.items():
-                if word == bare_func_name and file_path != base_name:
-                    include_file = os.path.splitext(file_path)[0] + ".h"
-                    if include_file not in existing_includes:
-                        include_file_double_quoted = '"' + include_file + '"'
-                        include_line = f'#include {include_file_double_quoted:<40}\t\t//-- added by convertor'
-                        if include_line not in includes:
-                            includes[include_line] = []
-                        includes[include_line].append(word)
-        
-        if not includes:
-            logging.info(f"\tNo new function includes needed for {base_name}")
-            return
-        
-        # Find the position of the local_headers_marker
-        marker = '#include "arduinoGlue.h"'
-        marker_pos = header_content.find(marker)
-        if marker_pos == -1:
-            marker = localincludes_marker
-            marker_pos = header_content.find(marker)
-            if marker_pos == -1:
-                logging.info(f"\tLocal headers marker not found in {os.path.basename(header_file_path)}")
-                marker = convertor_marker
-                marker_pos = header_content.find(marker)
-                if marker_pos == -1:
-                    logging.info(f"\tConvertor marker not found in {os.path.basename(header_file_path)}")
-                    return
-        
-        # Insert the includes after the marker
-        insert_pos = marker_pos + len(marker) + 1  # +1 for the newline
-        includes_text = ""
-        for include, functions in sorted(includes.items()):
-            logging.info(f"\tinsert_local_includes: {include:<60} ({', '.join(functions)})")
-            includes_text += f"{include}\n"
-        
-        new_content = (
-            header_content[:insert_pos] +
-            includes_text +
-            header_content[insert_pos:]
-        )
-        
-        # Write the modified content back to the header file
-        with open(header_file_path, 'w') as file:
-            file.write(new_content)
-    
-    except Exception as e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        line_number = exc_tb.tb_lineno
-        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
-        logging.error(f"\tError processing file [{base_name}]: {str(e)}")
-        exit()
-
-    logging.info(f"\tInserted {len(includes)} new function includes into {os.path.basename(header_file_path)}")
 
 #------------------------------------------------------------------------------------------------------
 def add_local_includes_to_project_header():
@@ -1409,8 +1080,8 @@ def add_local_includes_to_project_header():
     and adds new includes that are not already present. It then writes the modified content
     back to the header file.
     """    
-    print("");
-    logging.info(f"Processing add_local_includes_to_project_header(): {glob_project_name}")
+    logging.info("");
+    logging.info(f"Processing: add_local_includes_to_project_header(): {glob_project_name}")
 
     try:
         project_header = os.path.join(glob_pio_include, f"{glob_project_name}.h")
@@ -1478,8 +1149,8 @@ def add_local_includes_to_project_header():
 #------------------------------------------------------------------------------------------------------
 def copy_project_files():
     """Copy .ino files to glob_pio_src and .h files to glob_pio_include."""
-    print("")
-    logging.info("Processing copy_project_files() ..")
+    logging.info("")
+    logging.info("Processing: copy_project_files() ..")
 
     # Check if the file exists
     arduinoGlue_path = os.path.join(glob_pio_include, "arduinoGlue.h")
@@ -1492,23 +1163,24 @@ def copy_project_files():
 
     for file in os.listdir(glob_ino_project_folder):
         if file.endswith('.ino'):
-            logging.info(f"Copy [{file}] ..")
+            logging.debug(f"\tCopy [{file}] ..")
             shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_src)
         if file.endswith('.cpp'):
-            logging.info(f"Copy [{file}] ..")
+            logging.debug(f"\tCopy [{file}] ..")
             shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_src)
         elif file.endswith('.h'):
+            logging.debug(f"\tCopy [{file}] ..")
             shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_include)
-            #if file.endswith('.h') and file != f"{glob_project_name}.h":
-            logging.info(f"Copy [{file}] ..")
             logging.info(f"\tProcessing original header file: {file}")
             base_name = os.path.splitext(file)[0]
             header_path = os.path.join(glob_pio_include, f"{base_name}.h")
             process_original_header_file(header_path, base_name)
 
-    list_files_in_directory(glob_pio_src)
-    list_files_in_directory(glob_pio_include)
-    logging.info("\tCopied project files to PlatformIO folders")
+    if args.debug:
+        list_files_in_directory(glob_pio_src)
+        list_files_in_directory(glob_pio_include)
+
+    logging.debug("\tCopied project files to PlatformIO folders")
 
 #------------------------------------------------------------------------------------------------------
 def extract_all_includes_from_file(file_path):
@@ -1567,8 +1239,8 @@ def extract_global_variables(file_path):
     Extract global variable definitions from a single .ino, .cpp, or header file.
     Only variables declared outside of all function blocks are considered global.
     """
-    print("")
-    logging.info(f"Processing extract_global_variables() from : {os.path.basename(file_path)}")
+    logging.info("")
+    logging.info(f"Processing: extract_global_variables() from : {os.path.basename(file_path)}")
 
     global_vars = {}
 
@@ -1579,7 +1251,7 @@ def extract_global_variables(file_path):
     # Check if there are existing entries in dict_global_variables for this fbase
     if fbase in dict_global_variables:
         global_vars[fbase] = dict_global_variables[fbase]
-        logging.info(f"\t[1]Found {len(global_vars[fbase])} existing global variables for {fbase} in dict_global_variables")
+        logging.info(f"\t[1] Found {len(global_vars[fbase])} existing global variables for {fbase} in dict_global_variables")
 
     # Comprehensive list of object types, including String and dict_known_classes
     basic_types = r'uint8_t|int8_t|uint16_t|int16_t|uint32_t|int32_t|uint64_t|int64_t|char|int|float|double|bool|boolean|long|short|unsigned|signed|size_t|void|String|time_t|struct tm'
@@ -1643,15 +1315,15 @@ def extract_global_variables(file_path):
                                     var_type = var_type + '*'
                             
                             file_vars.append((var_type, var_name, current_function, is_pointer))
-                            logging.info(f"\t[1]Global variable found: [{var_type} {var_name}]")
+                            logging.debug(f"\t[1] Global variable found: [{var_type} {var_name}]")
                             if is_pointer:
-                                logging.info(f"\t\t[1]Pointer variable detected: [{var_type} {var_name}]")
+                                logging.debug(f"\t\t[1] Pointer variable detected: [{var_type} {var_name}]")
                 
                 elif class_instance_match and not stripped_line.lstrip().startswith('static'):
                     var_type = class_instance_match.group(1).strip()
                     var_name = class_instance_match.group(2).strip()
                     file_vars.append((var_type, var_name, current_function, False))
-                    logging.info(f"\t[1]Global class instance found: [{var_type} {var_name}]")
+                    logging.debug(f"\t[1] Global class instance found: [{var_type} {var_name}]")
 
         # Remove duplicate entries
         unique_file_vars = list(set(file_vars))
@@ -1663,7 +1335,7 @@ def extract_global_variables(file_path):
             global_vars[fbase] = unique_file_vars
 
         if unique_file_vars:
-            logging.info(f"\t[1]Processed {os.path.basename(file_path)} successfully. Found {len(unique_file_vars)} new global variables.")
+            logging.info(f"\t[1] Processed {os.path.basename(file_path)} successfully. Found {len(unique_file_vars)} new global variables.")
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -1673,11 +1345,12 @@ def extract_global_variables(file_path):
         exit()
 
     if global_vars[fbase]:
-        logging.info(f"\t[1]Total global variables for {fbase}: {len(global_vars[fbase])}")
+        logging.info(f"\t[1] Total global variables for {fbase}: {len(global_vars[fbase])}")
     else:
-        logging.info("\t>> [1]No global variables found")
+        logging.info("\t[1] No global variables found")
 
     return global_vars
+
 
 #------------------------------------------------------------------------------------------------------
 def extract_constant_pointers(file_path):
@@ -1685,44 +1358,52 @@ def extract_constant_pointers(file_path):
     Extract constant pointer array definitions with initializers from a single .ino, .cpp, or header file.
     Only variables declared outside of all function blocks are considered.
     """
-    print("")
-    logging.info(f"Processing extract_constant_pointers() from : {os.path.basename(file_path)}")
+    logging.info("")
+    logging.info(f"Processing: extract_constant_pointers() from : {os.path.basename(file_path)}")
 
     try:
+        global_vars = {}
+
         # Get the fbase (filename without extension)
         file = os.path.basename(file_path)
         fbase = os.path.splitext(file)[0]
 
-        global_vars = {}
         # Check if there are existing entries in dict_global_variables for this fbase
         if fbase in dict_global_variables:
             global_vars[fbase] = dict_global_variables[fbase]
-            logging.info(f"\t[2]Found {len(global_vars[fbase])} existing global variables for {fbase} in dict_global_variables")
-
-        file_vars = []
+            logging.info(f"\t[2] Found {len(global_vars[fbase])} existing global variables for {fbase} in dict_global_variables")
 
         # Comprehensive list of object types, including String and dict_known_classes
         basic_types = r'uint8_t|int8_t|uint16_t|int16_t|uint32_t|int32_t|uint64_t|int64_t|char|int|float|double|bool|boolean|long|short|unsigned|signed|size_t|void|String|time_t|struct tm'
-        known_classes = '|'.join(dict_known_classes)
-        types = rf'(?:{basic_types}|{known_classes})'
 
-        with open(file_path, 'r') as f:
-            content = f.read()
+        # Regular expression to match const char* or const int* declarations
+        pattern = rf'const\s+({basic_types})\s*\*\s*(\w+)\s*\[\]\s*{{' + r'\s*("[^"]*"\s*,\s*)*("[^"]*"\s*)\s*}|const\s+int\s*\*\s*(\w+)\s*{\s*\d+\s*(\s*,\s*\d+)*\s*};'
+        
+        file_vars = []
 
-        # Pattern to match constant pointer arrays with initializers
-        pattern = rf'^\s*const\s+({types})\s*\*\s*(\w+)\s*\[\s*\]\s*=\s*\{{([\s\S]*?)\}}\s*;'
+        with open(file_path, 'r') as file:
+            content = file.read()
 
-        # Find all matches in the content
-        matches = re.finditer(pattern, content, re.MULTILINE)
+        # Remove comments
+        content = re.sub(r'//.*?\n|/\*.*?\*/', '', content, flags=re.DOTALL)
 
-        for match in matches:
-            var_type = f"const {match.group(1)}*"
-            var_name = match.group(2) + '[]'
-            initialization = match.group(3).strip()
-
-            file_vars.append((var_type, var_name, None, True))
-            logging.info(f"\t[2]Constant pointer array found: [{var_type} {var_name}]")
-            logging.info(f"\t\t[2]Initialization: {initialization}")
+        # Split content by semicolon to handle each declaration separately
+        declarations = content.split(';')
+        
+        for declaration in declarations:
+            # Remove leading and trailing whitespace and check if it's not empty
+            declaration = declaration.strip()
+            if not declaration:
+                continue
+            match = re.match(pattern, declaration)
+            if match:
+                var_type = f"const {match.group(1)}*"
+                var_name = match.group(2) or match.group(5)  # Group 2 for array, group 5 for single pointer
+                current_function = None
+                is_pointer = True
+                var_full_name = var_name +"[]"
+                file_vars.append((var_type, var_full_name, current_function, is_pointer))
+                logging.info(f"\t[2] Constant pointer found: [{var_type} {var_full_name}]")
 
         # Remove duplicate entries
         unique_file_vars = list(set(file_vars))
@@ -1734,20 +1415,13 @@ def extract_constant_pointers(file_path):
             global_vars[fbase] = unique_file_vars
 
         if unique_file_vars:
-            logging.info(f"\t[2]Processed {os.path.basename(file_path)} successfully. Found {len(unique_file_vars)} constant pointer arrays.")
-        else:
-            logging.info("\t>> [2]No constant pointer arrays found")
+            logging.info(f"\t[2] Processed {os.path.basename(file_path)} successfully. Found {len(unique_file_vars)} new constant pointers.")
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         line_number = exc_tb.tb_lineno
         logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
         logging.error(f"\tError processing file {file_path}: {str(e)}")
-
-    if global_vars.get(fbase):
-        logging.info(f"\t[2]Total constant pointer arrays for {fbase}: {len(global_vars[fbase])}")
-    else:
-        logging.info("\t>> [2]No constant pointer arrays found")
 
     return global_vars
 
@@ -1766,7 +1440,7 @@ def extract_undefined_vars_in_file(file_path):
     dict: Dictionary of undefined variables used in the file, with their line numbers, file names, var_type, var_name, and defined file
     """
     logging.info("===========================")
-    logging.info(f"Processing extract_undefined_vars_in_file() for file: [{os.path.basename(file_path)}]")
+    logging.info(f"Processing: extract_undefined_vars_in_file() for file: [{os.path.basename(file_path)}]")
 
     # List of C++ keywords and common Arduino types/functions to exclude
     KEYWORDS_AND_TYPES = set([
@@ -1866,8 +1540,8 @@ def extract_prototypes(file_path):
     Returns:
     dict: Dictionary of function prototypes found in the file, with (function name, parameters) as keys and tuples (prototype, file_path, bare_function_name) as values.
     """
-    print("")
-    logging.info(f"Processing extract_prototypes() from file: [{os.path.basename(file_path)}]")
+    logging.info("")
+    logging.info(f"Processing: extract_prototypes() from file: [{os.path.basename(file_path)}]")
     
     prototypes = {}
     
@@ -1907,10 +1581,10 @@ def extract_prototypes(file_path):
             key = (func_name, params.strip())
             prototypes[key] = (prototype, os.path.basename(file_path), func_name)
             
-            logging.info(f"\tExtracted prototype from [{os.path.basename(file_path)}]: {prototype}")
+            logging.debug(f"\tExtracted prototype [{prototype}]")
         
         if not prototypes:
-            logging.info(f"\tNo function prototypes found in {os.path.basename(file_path)}")
+            logging.debug(f"\tNo function prototypes found in {os.path.basename(file_path)}")
     
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -1927,8 +1601,8 @@ def extract_class_instances(file_path):
     Extract class instance definitions from a single .ino, .cpp, or .h file.
     Includes both global and function-local class instance declarations.
     """
-    print("")
-    logging.info(f"Processing extract_class_instances() from: {short_path(file_path)}")
+    logging.info("")
+    logging.info(f"Processing: extract_class_instances() from: {short_path(file_path)}")
 
     file  = os.path.basename(file_path)
     fbase = os.path.splitext(file)[0]
@@ -2001,7 +1675,7 @@ def extract_class_instances(file_path):
                     logging.info(f"\t\tFound singleton class [{class_type}] in [{header}]")
                     file_instances.append((header, "-", "=", fbase))
                     included_headers.add(header)
-                    logging.info(f"{fbase}: Added include for singleton header {header}")
+                    logging.debug(f"{fbase}: Added include for singleton header {header}")
         
         if file_instances:
             class_instances[file_path] = file_instances
@@ -2022,8 +1696,8 @@ def extract_class_instances(file_path):
 #------------------------------------------------------------------------------------------------------
 def update_arduino_glue(dict_all_includes, dict_global_variables, dict_prototypes):
     
-    print("")
-    logging.info("Processing update_arduino_glue()")
+    logging.info("")
+    logging.info("Processing: update_arduino_glue()")
 
     try:
         glue_path = os.path.join(glob_pio_include, "arduinoGlue.h")
@@ -2045,7 +1719,7 @@ def update_arduino_glue(dict_all_includes, dict_global_variables, dict_prototype
         dict_name = "dict_all_includes"
         new_content += f"//-- {dict_name} ---\n"
         for include in dict_all_includes:
-            print(f"Added:\t{include}")
+            logging.debug(f"Added:\t{include}")
             new_content += f"{include}\n"
         new_content += "\n"
 
@@ -2056,7 +1730,7 @@ def update_arduino_glue(dict_all_includes, dict_global_variables, dict_prototype
             if vars_list:  # Only print for files that have global variables
                 for var_type, var_name, function, is_pointer in vars_list:
                     var_name += ';'
-                    print(f"Added:\textern {var_type:<15} {var_name:<35}\t\t//-- from {file_path})")
+                    logging.debug(f"Added:\textern {var_type:<15} {var_name:<35}\t\t//-- from {file_path})")
                     new_content += (f"extern {var_type:<15} {var_name:<35}\t\t//-- from {file_path}\n")
         new_content += "\n"
 
@@ -2068,10 +1742,10 @@ def update_arduino_glue(dict_all_includes, dict_global_variables, dict_prototype
             prototype, file_name, bare_func_name = value
             if sav_file != file_name:
                 sav_file = file_name
-                print(f"Added:\t//-- from {file_name} ----------")
+                logging.debug(f"Added:\t//-- from {file_name} ----------")
                 new_content += (f"//-- from {file_name} -----------\n")
             prototype_sm = prototype + ';'
-            print(f"Added:\t{prototype_sm}")
+            logging.debug(f"Added:\t{prototype_sm}")
             new_content += (f"{prototype_sm:<60}\n")
         new_content += "\n"
 
@@ -2088,8 +1762,8 @@ def update_arduino_glue(dict_all_includes, dict_global_variables, dict_prototype
 
 #------------------------------------------------------------------------------------------------------
 def insert_class_instances_to_header_files(file_name):
-    print("")
-    logging.info(f"Processing insert_class_instances_to_header_files() [{os.path.splitext(os.path.basename(file_name))[0]}]")
+    logging.info("")
+    logging.info(f"Processing: insert_class_instances_to_header_files() [{os.path.splitext(os.path.basename(file_name))[0]}]")
     
     global dict_class_instances
 
@@ -2191,7 +1865,7 @@ def insert_class_instances_to_header_files(file_name):
 def update_header_with_prototypes(header_path, prototypes):
     """Update header file with function prototypes."""
     logging.info()
-    logging.info(f"Processing update_header_with_prototypes() file: {os.path.basename(header_path)}")
+    logging.info(f"Processing: update_header_with_prototypes() file: {os.path.basename(header_path)}")
 
     marker_index = header_path.find(platformio_marker)
     if marker_index != -1:
@@ -2249,7 +1923,7 @@ def find_undefined_functions_and_update_headers(glob_pio_src, glob_pio_include, 
     NON_FUNCTION_KEYWORDS = {'if', 'else', 'for', 'while', 'switch', 'case', 'default', 'do', 'return', 'break', 'continue'}
 
     logging.info()
-    logging.info("Processing find_undefined_functions_and_update_headers")
+    logging.info("Processing: find_undefined_functions_and_update_headers")
 
     for file in os.listdir(glob_pio_src):
         if file.endswith('.cpp'):
@@ -2396,8 +2070,8 @@ def XXX_process_ino_files(glob_pio_src, glob_pio_include, glob_project_name, glo
     global global_extern_declarations
     global_extern_declarations = set()  # Reset global extern declarations
 
-    print("")
-    logging.debug(f"Processing process_ino_files(): {global_vars}")
+    logging.info("")
+    logging.debug(f"Processing: process_ino_files(): {global_vars}")
 
     main_ino = f"{glob_project_name}.ino"
     #aaw#main_ino_path = os.path.join(glob_pio_src, main_ino)
@@ -2455,8 +2129,8 @@ def XXX_process_ino_files(glob_pio_src, glob_pio_include, glob_project_name, glo
 
 #------------------------------------------------------------------------------------------------------
 def add_guards_and_marker_to_header(file_path):
-    print("")
-    logging.info(f"Processing add_guards_and_marker_to_header() file: [{os.path.basename(file_path)}]")
+    logging.info("")
+    logging.info(f"Processing: add_guards_and_marker_to_header() file: [{os.path.basename(file_path)}]")
     
     with open(file_path, 'r') as file:
         content = file.read()
@@ -2509,8 +2183,8 @@ def add_guards_and_marker_to_header(file_path):
 
 #------------------------------------------------------------------------------------------------------
 def insert_header_include_in_cpp(file_path):
-    print("")
-    logging.info(f"Processing insert_header_include_in_cpp(): [{os.path.basename(file_path)}]")
+    logging.info("")
+    logging.info(f"Processing: insert_header_include_in_cpp(): [{os.path.basename(file_path)}]")
     
     with open(file_path, 'r') as file:
         content = file.read()
@@ -2563,8 +2237,8 @@ def insert_header_include_in_cpp(file_path):
 #------------------------------------------------------------------------------------------------------
 def preserve_original_headers():
     """Read and preserve the original content of all existing header files."""
-    print("")
-    logging.info("Processing preserve_original_headers() ..")
+    logging.info("")
+    logging.info("Processing: preserve_original_headers() ..")
 
     original_headers = {}
     for file in os.listdir(glob_pio_include):
@@ -2579,8 +2253,8 @@ def preserve_original_headers():
 #------------------------------------------------------------------------------------------------------
 def update_project_header(glob_pio_include, glob_project_name, original_content):
     """Update project header file with includes for all created headers while preserving original content."""
-    print("")
-    logging.info("Processing update_project_header() ..")
+    logging.info("")
+    logging.info("Processing: update_project_header() ..")
 
     project_header_path = os.path.join(glob_pio_include, f"{glob_project_name}.h")
 
@@ -2631,15 +2305,18 @@ def main():
         backup_project(args.project_dir)
 
     try:
-        #glob_ino_project_folder, glob_project_name, glob_pio_folder, glob_pio_src, glob_pio_include = 
+        logging.info("")
+        logging.info("=======================================================================================================")
+        logging.info(f"[Step 1] Setup the folder structure for a PlatformIO project")
+        logging.info("=======================================================================================================")
+
         set_glob_project_info(args.project_dir)
         logging.info(f"           Project folder: {glob_ino_project_folder}")
 
         marker = "arduinoIDE2platformIO-convertor"
-        logging.info(f"        PlatformIO folder: {short_path(glob_pio_folder)}")
-        logging.info(f"    PlatformIO src folder: {short_path(glob_pio_src)}")
-        logging.info(f"PlatformIO include folder: {short_path(glob_pio_include)}\n")
-
+        logging.info(f"\t        PlatformIO folder: {short_path(glob_pio_folder)}")
+        logging.info(f"\t    PlatformIO src folder: {short_path(glob_pio_src)}")
+        logging.info(f"\tPlatformIO include folder: {short_path(glob_pio_include)}")
 
         remove_pio_tree("platformio.ini")
 
@@ -2658,9 +2335,10 @@ def main():
 
         list_files_in_directory(glob_pio_src)
 
-        print("")
+        logging.info("")
         logging.info("=======================================================================================================")
-        logging.info(f"[Step 1] Process all '.ino' and 'h' files")
+        logging.info("[Step 2] Process all '.ino' and 'h' files extracting includes, global variables and ")
+        logging.info("         prototypes.. and insert Header Guards in all existing header files")
         logging.info("=======================================================================================================")
 
         for folder in search_folders:
@@ -2668,22 +2346,22 @@ def main():
                 for file in files:
                     if file.endswith(('.h', '.ino')):
                         file_path = os.path.join(root, file)
-                        #base_name = os.path.splitext(file)[0]  # Get the basename without extension
                         base_name = os.path.basename(file)  # Get the basename without extension
-                        print("")
-                        logging.info("-------------------------------------------------------------------------------------------------------")
-                        logging.info(f"Processing file: {short_path(file_path)} basename: [{base_name}]")
+                        logging.info("")
+                        logging.debug("-------------------------------------------------------------------------------------------------------")
+                        logging.debug(f"Processing file: {short_path(file_path)} basename: [{base_name}]")
 
                         lib_includes = extract_all_includes_from_file(file_path)
-                        print_includes(lib_includes)
+                        if args.debug:
+                          print_includes(lib_includes)
                         dict_all_includes.update({include: None for include in lib_includes})
                         global_vars = extract_global_variables(file_path)
                         if args.debug:
                             print_global_vars(global_vars)
                         dict_global_variables.update(global_vars)
                         global_vars = extract_constant_pointers(file_path)
-                        #if args.debug:
-                        print_global_vars(global_vars)
+                        if args.debug:
+                            print_global_vars(global_vars)
                         dict_global_variables.update(global_vars)
                         prototypes = extract_prototypes(file_path)
                         if args.debug:
@@ -2692,92 +2370,45 @@ def main():
                         if file.endswith('.h') and file != "arduinoGlue.h":
                             add_guards_and_marker_to_header(file_path)
 
+        logging.info("")
         logging.info("And now the complete list of #includes:")
         print_includes(dict_all_includes)
         logging.info("And now the complete list of global variables:")
         print_global_vars(dict_global_variables)
-        #logging.info("And now the complete list of class instances:")
-        #print_class_instances(dict_class_instances)
         logging.info("And now the complete list of prototypes:")
         print_prototypes(dict_prototypes)
 
         logging.info("And now add all dict's to arduinoGlue.h:")
         update_arduino_glue(dict_all_includes, dict_global_variables, dict_prototypes)
 
-        search_folders = [glob_pio_src, glob_pio_include]
-        print("")
-        logging.info("=======================================================================================================")
-        logging.info(f"[Step 2] Search for undefined variables")
-        logging.info("=======================================================================================================")
-
-        """" #aaw#
-        for folder in search_folders:
-            for root, _, files in os.walk(folder):
-                for file in files:
-                    if file.endswith(('.h', '.ino')):
-                        file_path = os.path.join(root, file)
-                        base_name = os.path.splitext(file)[0]  # Get the basename without extension
-                        global_vars_undefined = extract_undefined_vars_in_file(file_path)
-                        print_global_vars_undefined(global_vars_undefined)
-                        dict_undefined_vars_used.update(global_vars_undefined)
-        print("")
-        logging.info("And now the complete list of undefined variables:")
-        print_global_vars_undefined(dict_undefined_vars_used)
-        """
-
-        print("")
+        logging.info("")
         logging.info("=======================================================================================================")
         logging.info(f"[Step 3] Create new header files for all '.ino' files")
         logging.info("=======================================================================================================")
 
         for filename in os.listdir(glob_pio_src):
-            #logging.debug(f"Processing file: {filename}")
+            logging.debug(f"Processing file: {os.path.basename(filename)}")
             ino_name    = os.path.basename(filename)
             base_name   = os.path.splitext(ino_name)[0]  # Get the basename without extension
             header_name = ino_name.replace(".ino", ".h")
             if filename.endswith(".ino"):
                 create_new_header_file(ino_name, header_name)
-                #aaw# move_includes_from_ino_to_h(ino_name)
-                #aaw#insert_prototypes(base_name)
-                insert_external_variables(base_name)
-                #aaw#insert_local_includes(ino_name)
-                #aaw#extract_class_instances_by_methods(ino_name)
+
+        logging.info("")
+        logging.info("=======================================================================================================")
+        logging.info(f"[Step 4] add local includes to all '.ino' files  (insert '#include \"x.h\"' to x.ino)")
+        logging.info("=======================================================================================================")
 
         #-- add all local includes to {project_name}.h
         add_local_includes_to_project_header()
-        
-        print("")
-        logging.info("=======================================================================================================")
-        logging.info(f"[Step 4] Check all '.ino' and '.h' files")
-        logging.info(f"         Look for class instances used but not defined.")
-        logging.info("=======================================================================================================")
 
-        for filename in os.listdir(glob_pio_src):
-            print("")
-            logging.debug(f"\tProcessing filename: {filename}")
-            ino_name = os.path.basename(filename)
-            logging.info(f"\t\tProcessing ino_file: {ino_name}")
-            base_name = os.path.splitext(ino_name)[0]  # Get the basename without extension
-            logging.info(f"\t\t\tbase_name: {ino_name}")
-            #insert_class_instances_to_header_files(filename)
-
-        #print("")
-        #logging.info("=======================================================================================================")
-        #logging.info(f"[Step 5] insert an #include for all '.h' files in {glob_project_name}.h")
-        #logging.info("=======================================================================================================")
-
-        #for filename in os.listdir(glob_pio_src):
-        #    logging.debug(f"\tProcessing filename: {filename}")
-
-
-
-        print("")
+        logging.info("")
         logging.info("=======================================================================================================")
         logging.info(f"[Step 5] rename all '.ino' files to '.cpp'")
         logging.info("=======================================================================================================")
 
         for filename in os.listdir(glob_pio_src):
-            logging.debug(f"Found file: {filename}")
+            logging.debug(f"Found file: {os.path.basename(filename)}")
             ino_name = os.path.basename(filename)
             base_name = os.path.splitext(ino_name)[0]  # Get the basename without extension
             header_name = ino_name.replace(".ino", ".h")
@@ -2788,8 +2419,10 @@ def main():
                 rename_file(ino_path, cpp_path)
                 insert_header_include_in_cpp(cpp_path)
 
-        print("")
-        logging.info("Arduino to PlatformIO conversion completed successfully")
+        logging.info("")
+        logging.info("*************************************************************")
+        logging.info("** Arduino to PlatformIO conversion completed successfully **")
+        logging.info("*************************************************************")
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()

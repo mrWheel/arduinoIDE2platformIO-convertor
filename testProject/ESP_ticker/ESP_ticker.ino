@@ -96,24 +96,30 @@ char *updateTime()
 //---------------------------------------------------------------------
 bool getTheLocalTime(struct tm *info, uint32_t ms)
 {
-  //-- getLocalTime() is not implemented in the ArduinoIDE
-  //-- so this is a 'work around' function
-  uint32_t start = millis();
-  time_t now;
-  while((millis()-start) <= ms)
-  {
-    time(&now);
-    localtime_r(&now, info);
-    if(info->tm_year > (2016 - 1900))
+    if (info == nullptr) 
     {
-      return true;
+        return false;
     }
-    delay(10);
-  }
-  return false;
 
-} // getTheLocalTime()
-
+    uint32_t start = millis();
+    time_t now;
+    
+    while((millis() - start) <= ms)
+    {
+        yield();
+        time(&now);
+        if (localtime_r(&now, info) != nullptr) 
+        {
+            if (info->tm_year > (2016 - 1900)) 
+            {
+                return true;
+            }
+        }
+        delay(500);  // Increase delay to prevent potential crashes
+    }
+    return false;
+    
+} //  getTheLocalTime()
 
 //---------------------------------------------------------------------
 void splitNewsNoWords(const char *noNo)

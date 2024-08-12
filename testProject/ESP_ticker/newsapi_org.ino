@@ -151,7 +151,7 @@ bool getNewsapiData()
 //----------------------------------------------------------------------
 void removeNewsData()
 {
-  char nwsName[15];
+  char nwsName[20];
 
   for(int n=0; n<=settingNewsMaxMsg; n++)
   {

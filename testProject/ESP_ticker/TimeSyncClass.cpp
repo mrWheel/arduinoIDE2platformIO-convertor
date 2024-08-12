@@ -4,7 +4,6 @@
 
 #include "TimeSyncClass.h"
 
-//aaw#TimeSync::TimeSync() {}
 TimeSyncClass::TimeSyncClass() {}
 
 /**
@@ -87,7 +86,7 @@ void TimeSyncClass::logTime()
 {
   time_t now;
   time(&now);
-  struct tm timeinfo;
+  struct tm timeinfo = {0};
 
   if (localtime(&now)->tm_year <= 120)
   {
