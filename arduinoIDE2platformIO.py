@@ -1148,7 +1148,7 @@ def add_local_includes_to_project_header():
 
 #------------------------------------------------------------------------------------------------------
 def copy_project_files():
-    """Copy .ino files to glob_pio_src and .h files to glob_pio_include."""
+    """Copy .ino, .cpp, .c files to glob_pio_src and .h files to glob_pio_include."""
     logging.info("")
     logging.info("Processing: copy_project_files() ..")
 
@@ -1165,7 +1165,10 @@ def copy_project_files():
         if file.endswith('.ino'):
             logging.debug(f"\tCopy [{file}] ..")
             shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_src)
-        if file.endswith('.cpp'):
+        elif file.endswith('.cpp'):
+            logging.debug(f"\tCopy [{file}] ..")
+            shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_src)
+        elif file.endswith('.c'):
             logging.debug(f"\tCopy [{file}] ..")
             shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_src)
         elif file.endswith('.h'):
@@ -2326,6 +2329,14 @@ def main():
             logging.error(f"PlatformIO folder does not exist: {glob_pio_folder}")
             return
 
+        logging.info("")
+        logging.info("=======================================================================================================")
+        logging.info(f"[Step 2] Copy all .ino, .cpp, .c and .h files from the Arduino project")
+        logging.info( "         Copy the data folder (if it excists) from the Arduino project")
+        logging.info( "         Create the platformio.ini file")
+        logging.info( "         Extract all #define statements from all .ino and .h files")
+        logging.info("=======================================================================================================")
+
         copy_project_files()
         copy_data_folder()
         create_platformio_ini()
@@ -2337,7 +2348,7 @@ def main():
 
         logging.info("")
         logging.info("=======================================================================================================")
-        logging.info("[Step 2] Process all '.ino' and 'h' files extracting includes, global variables and ")
+        logging.info("[Step 3] Process all '.ino' and 'h' files extracting includes, global variables and ")
         logging.info("         prototypes.. and insert Header Guards in all existing header files")
         logging.info("=======================================================================================================")
 
@@ -2383,7 +2394,7 @@ def main():
 
         logging.info("")
         logging.info("=======================================================================================================")
-        logging.info(f"[Step 3] Create new header files for all '.ino' files")
+        logging.info(f"[Step 4] Create new header files for all '.ino' files")
         logging.info("=======================================================================================================")
 
         for filename in os.listdir(glob_pio_src):
@@ -2396,7 +2407,7 @@ def main():
 
         logging.info("")
         logging.info("=======================================================================================================")
-        logging.info(f"[Step 4] add local includes to all '.ino' files  (insert '#include \"x.h\"' to x.ino)")
+        logging.info(f"[Step 5] add all local includes to the 'project_name.ino' file  (insert '#include \"x.h\"' to x.ino)")
         logging.info("=======================================================================================================")
 
         #-- add all local includes to {project_name}.h
@@ -2404,7 +2415,7 @@ def main():
 
         logging.info("")
         logging.info("=======================================================================================================")
-        logging.info(f"[Step 5] rename all '.ino' files to '.cpp'")
+        logging.info(f"[Step 6] rename all '.ino' files to '.cpp'")
         logging.info("=======================================================================================================")
 
         for filename in os.listdir(glob_pio_src):
