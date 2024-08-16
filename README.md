@@ -2,13 +2,15 @@
 
 This Python script automates the process of converting an Arduino IDE project to a PlatformIO project structure. It's designed to simplify the transition from Arduino's traditional setup to PlatformIO's more organized and powerful environment.
 
+For more information look <a href="https://willem.aandewiel.nl/index.php/2024/08/16/arduino-to-platformio-project-conversion/">here</a>.
+
 ## Features
 
 - Converts Arduino (.ino) files to C++ (.cpp) files
 - Creates appropriate header (.h) files for each source file
-- Extracts and centralizes all #define statements into a single `allDefines.h` file
+- Extracts and centralizes all #define statements into a single `arduinoGlue.h` file
 - Identifies and properly handles global variables
-- Generates function prototypes in header files
+- Generates function prototypes in the `arduinoGlue.h` file
 - Preserves existing code structure and comments
 - Copies the project's data folder (if it exists) to the PlatformIO structure
 - Creates a basic `platformio.ini` file for PlatformIO configuration
@@ -23,21 +25,21 @@ This Python script automates the process of converting an Arduino IDE project to
    - Creates corresponding `.h` files for each `.cpp` file
 
 3. **Define Handling**:
-   - Extracts all non-function-like #define statements
-   - Places them in a centralized `allDefines.h` file
+   - Extracts all #define statements
+   - Places them in a centralized `arduinoGlue.h` file
    - Comments out original #define statements in source files
 
 4. **Global Variable Management**:
    - Identifies global variables
-   - Adds appropriate `extern` declarations to header files
+   - Places them into the `arduinoGlue.h` file and adds `extern` in front of the declarations
 
 5. **Function Prototype Generation**:
    - Extracts function declarations
-   - Adds them to the corresponding header files
+   - Adds them to the `arduinoGlue.h` header file
 
 6. **Main Project File Handling**:
    - Specially processes the main project file (originally .ino, converted to .cpp)
-   - Ensures all necessary includes and declarations are present
+   - Ensures all necessary includes are present
 
 7. **Data Folder Handling**:
    - Copies the `data` folder from the Arduino project to the PlatformIO structure (if it exists)
@@ -51,7 +53,7 @@ This Python script automates the process of converting an Arduino IDE project to
 2. Place the script in a directory accessible to your Arduino project
 3. Run the script with the following command:
 ```
-python arduinoIDE2platformIO.py --project_dir /path/to/your/arduino/project
+python3 arduinoIDE2platformIO.py --project_dir /path/to/your/arduino/project
 ```
   or `cd` to the directory where the Arduino.ino files are located and run the following command:
 ```
@@ -68,7 +70,7 @@ python arduinoIDE2platformIO.py
 
 ## Contributing
 
-Contributions to improve the converter are welcome. Please feel free to submit issues or pull requests on the GitHub repository.
+Contributions to improve the converter are welcome. Please feel free to submit issues or merge requests on the GitHub repository.
 
 ## License
 
