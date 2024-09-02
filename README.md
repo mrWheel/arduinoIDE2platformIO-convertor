@@ -4,6 +4,24 @@ This Python script automates the process of converting an Arduino IDE project to
 
 For more information look <a href="https://willem.aandewiel.nl/index.php/2024/08/16/arduino-to-platformio-project-conversion/">here</a>.
 
+## To Do (If you want to help, please create a merge request)
+- `struct` definitions should als be 'commented out' and placed in `arduinoGlue.h`
+- Array declarations in the form
+  ```
+      char actualTableArray[][35] = { "timestamp"
+                           , "power_returned_l1", "power_returned_l2", "power_returned_l3"
+                           , "\0"
+                         };
+   ```
+   should also be declared in `arduinoGlue.h` like:
+     ```
+     extern char actualTableArray[][35];
+     ```
+- A run-option to name the `arduinoGlue.h` file to your liking.
+- A run-option to place the `PlatformIO` folder anywhere you want (and not inside the Arduino program folder).
+- More testing (f.i. does the `--project_dir` option works - never tested it myself).
+- More testing in general (what works and what does not work).
+     
 ## Features
 
 - Converts Arduino (.ino) files to C++ (.cpp) files
