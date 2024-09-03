@@ -59,6 +59,7 @@ dict_global_variables     = {}
 dict_undefined_vars_used  = {}
 dict_prototypes           = {}
 dict_class_instances      = {}
+dict_struct_declarations  = {}
 dict_includes             = {}
 platformio_marker         = "/PlatformIO"
 existingincludes_marker   = "//== Existing Includes =="
@@ -121,7 +122,8 @@ def set_glob_project_info(project_dir):
     global glob_pio_src
     global glob_pio_include
 
-    glob_ino_project_folder = os.path.abspath(glob_working_dir)
+    # Use project_dir if provided, otherwise use the current working directory
+    glob_ino_project_folder = os.path.abspath(project_dir) if project_dir else os.path.abspath(glob_working_dir)
     glob_project_name       = os.path.basename(glob_ino_project_folder)
     glob_pio_folder         = os.path.join(glob_ino_project_folder, "PlatformIO")
     glob_pio_project_folder = os.path.join(glob_pio_folder, glob_project_name)
@@ -396,6 +398,18 @@ def print_includes(includes):
         logging.error(f"A\tn error occurred at line {line_number}: {str(e)}")
         exit()
 
+
+
+#------------------------------------------------------------------------------------------------------
+def print_struct_definitions(struct_definitions):
+    if struct_definitions:
+        logging.info(f"\tStruct definitions found:")
+        for struct_name, struct_body in struct_definitions.items():
+            logging.info(f"\t\t{struct_name}:")
+            for line in struct_body.split('\n'):
+                logging.info(f"\t\t\t{line.strip()}")
+    else:
+        logging.info(f"\tNo struct definitions found in the file")
 
 #------------------------------------------------------------------------------------------------------
 def list_files_in_directory(directory_path):
@@ -782,20 +796,20 @@ default_envs = myBoard
 ;board_fuses.hfuse = 0xDC    
 #board_fuses.efuse = 0xFF
 
-framework = arduino
-board_build.filesystem = LittleFS
-monitor_speed = 115200
-upload_speed = 115200
-upload_port = <select port like "/dev/cu.usbserial-3224144">
-build_flags =
-\t-D DEBUG
-
-lib_ldf_mode = deep+
-
-lib_deps =
+#framework = arduino
+#board_build.filesystem = LittleFS
+#monitor_speed = 115200
+#upload_speed = 115200
+#upload_port = <select port like "/dev/cu.usbserial-3224144">
+#build_flags =
+#\t-D DEBUG
+#
+#lib_ldf_mode = deep+
+#
+#lib_deps =
 ;\t<select libraries with "PIO Home" -> Libraries
 
-monitor_filters =
+#monitor_filters =
 ;-- esp8266
 #  esp8266_exception_decoder
 """
@@ -807,6 +821,89 @@ monitor_filters =
         logging.info(f"\tplatformio.ini file already exists at [{short_path(platformio_ini_path)}]")
 
 
+#------------------------------------------------------------------------------------------------------
+def move_struct_declarations():
+    logging.info("")
+    logging.info(f"Processing: move_struct_declarations() ")
+
+    search_folders = [glob_pio_src, glob_pio_include]
+
+    for folder in search_folders:
+        for root, _, files in os.walk(folder):
+            for file in files:
+                if file.endswith(('.h', '.ino')) and not file.startswith('arduinoGlue'):
+                    file_path = os.path.join(root, file)
+                    logging.debug(f"\tProcessing file: {short_path(file_path)}")
+
+                    try:
+                        with open(file_path, 'r') as file:
+                            content = file.read()
+
+                        # Regular expression to match struct declarations
+                        struct_pattern = r'(struct\s+(?:\w+\s+)*(?:\w+\s*)?{[^}]*})'
+
+                        # Find all struct declarations
+                        struct_declarations = re.finditer(struct_pattern, content, re.DOTALL | re.MULTILINE)
+
+                        modified_content = content
+                        structs_to_move = []
+
+                        for match in struct_declarations:
+                            struct_decl = match.group(1)
+                            
+                            # Prepare the struct declaration for arduinoGlue.h
+                            arduinoGlue_struct = f"\t\t//-- from {os.path.basename(file_path)}\n{struct_decl}\n\n"
+                            structs_to_move.append(arduinoGlue_struct)
+
+                            # Comment out the struct declaration in the original file
+                            commented_struct = f"/*\t\t\t\t\t--- struct moved to arduinoGlue.h ---\n{struct_decl}\n*/"
+
+                            modified_content = modified_content.replace(struct_decl, commented_struct)
+
+                        # Write modified content back to the original file (File Under Test)
+                        with open(file_path, 'w') as file:
+                            file.write(modified_content)
+
+                        # Insert struct declarations into arduinoGlue.h at the correct position
+                        arduinoGlue_path = os.path.join(glob_pio_include, 'arduinoGlue.h')
+                        with open(arduinoGlue_path, 'r+') as file:
+                            arduinoGlue_content = file.read()
+                            
+                            # Find the correct insertion point
+                            last_include = arduinoGlue_content.rfind('#include')
+                            last_define = arduinoGlue_content.rfind('#define')
+                            header_guard = arduinoGlue_content.find('#ifndef')
+                            
+                            if last_include != -1:
+                                insert_point = arduinoGlue_content.find('\n', last_include) + 1
+                            elif last_define != -1:
+                                insert_point = arduinoGlue_content.find('\n', last_define) + 1
+                            elif header_guard != -1:
+                                insert_point = arduinoGlue_content.find('\n', header_guard) + 1
+                            else:
+                                insert_point = 0
+                            
+                            # Insert the struct declarations
+                            new_content = (arduinoGlue_content[:insert_point] + '\n' +
+                                          '\n'.join(structs_to_move) +
+                                          arduinoGlue_content[insert_point:])
+                            
+                            # Write the updated content back to arduinoGlue.h
+                            file.seek(0)
+                            file.write(new_content)
+                            file.truncate()
+
+                        logging.info(f"\tMoved {len(structs_to_move)} struct declaration(s) from [{os.path.basename(file_path)}] to arduinoGlue.h")
+
+                    except FileNotFoundError:
+                        logging.error(f"Error: File {file_path} not found.")
+                    except IOError:
+                        logging.error(f"Error: Unable to read or write file {file_path}.")
+                    except Exception as e:
+                        exc_type, exc_obj, exc_tb = sys.exc_info()
+                        line_number = exc_tb.tb_lineno
+                        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
+        
 #------------------------------------------------------------------------------------------------------
 def extract_and_comment_defines():
     """
@@ -820,7 +917,6 @@ def extract_and_comment_defines():
     logging.info(f"Searching for #define statements in {short_path(glob_pio_folder)}")
 
     # Only search within glob_pio_src and glob_pio_include folders
-    #search_folders = [os.path.join(glob_pio_folder, 'glob_pio_src'), glob_pio_include]
     search_folders = [glob_pio_src, glob_pio_include]
 
     for folder in search_folders:
@@ -2068,67 +2164,6 @@ def process_function_references(glob_pio_src, glob_pio_include):
     logging.info("\tProcessed function references and updated header files")
     return function_reference_array  # Return the function_reference_array
 
-#------------------------------------------------------------------------------------------------------
-def XXX_process_ino_files(glob_pio_src, glob_pio_include, glob_project_name, global_vars, class_instances):
-    global global_extern_declarations
-    global_extern_declarations = set()  # Reset global extern declarations
-
-    logging.info("")
-    logging.debug(f"Processing: process_ino_files(): {global_vars}")
-
-    main_ino = f"{glob_project_name}.ino"
-    #aaw#main_ino_path = os.path.join(glob_pio_src, main_ino)
-
-    files_to_process = [f for f in os.listdir(glob_pio_src) if f.endswith('.ino')]
-    #if main_ino not in files_to_process and os.path.exists(main_ino_path):
-    #    files_to_process.append(main_ino)
-
-    used_vars_by_file = {}
-
-    for file in files_to_process:
-        logging.info("..")
-        base_name = os.path.splitext(file)[0]
-        header_path = os.path.join(glob_pio_include, f"{base_name}.h")
-        source_path = os.path.join(glob_pio_src, file)
-
-        logging.info(f"\tProcessing file: {short_path(source_path)}, header_path {short_path(header_path)}")
-
-        # Create the header file if it doesn't exist
-        create_header_file(header_path, base_name)
-
-        with open(source_path, 'r') as f:
-            content = f.read()
-
-        #content_no_comments = remove_comments_preserve_strings(content)
-
-        #used_vars = set(re.findall(r'\b(\w+)\b', content_no_comments))
-        used_vars = set(re.findall(r'\b(\w+)\b', content))
-        used_vars_by_file[file] = used_vars
-        logging.debug(f"\tUsed vars in {file}: {used_vars}")
-
-        prototypes = extract_prototypes(content, file)
-        logging.info(f"\tFound {len(prototypes)} prototypes in {file}")
-
-        #aaw#update_header_with_prototypes(header_path, prototypes)
-
-        # Add include statement for the corresponding header
-        include_statement = f'#include "{base_name}.h"'
-        if include_statement not in content:
-            content = f'{include_statement}\n\n{content}'
-
-        # Write the updated content back to the file
-        new_file_path = os.path.join(glob_pio_src, f"{base_name}.cpp")
-        with open(new_file_path, 'w') as f:
-            f.write(content)
-
-        # Remove the original .ino file
-        os.remove(source_path)
-
-    # Now that we have processed all files and collected used_vars_by_file, we can update headers with externs
-    update_header_with_externs(global_vars, class_instances, used_vars_by_file)
-
-    logging.info("\tProcessed .ino files: renamed, updated headers, and converted to .cpp")
-
 
 #------------------------------------------------------------------------------------------------------
 def add_guards_and_marker_to_header(file_path):
@@ -2304,8 +2339,11 @@ def main():
     args = parse_arguments()
     setup_logging(args.debug)
 
-    if args.backup:
-        backup_project(args.project_dir)
+    logging.info(f"Global project dir is [%s]", args.project_dir)
+
+    # Backup the original project if requested
+    #if args.backup:
+    #    backup_project(args.project_dir)
 
     try:
         logging.info("")
@@ -2341,6 +2379,8 @@ def main():
         copy_data_folder()
         create_platformio_ini()
         extract_and_comment_defines()
+        move_struct_declarations()
+
 
         search_folders = [glob_pio_src, glob_pio_include]
 
@@ -2378,6 +2418,7 @@ def main():
                         if args.debug:
                             print_prototypes(prototypes)
                         dict_prototypes.update(prototypes)
+
                         if file.endswith('.h') and file != "arduinoGlue.h":
                             add_guards_and_marker_to_header(file_path)
 
