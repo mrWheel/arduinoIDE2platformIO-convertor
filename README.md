@@ -20,6 +20,15 @@ For more information look <a href="https://willem.aandewiel.nl/index.php/2024/08
 - A run-option to name the `arduinoGlue.h` file to your liking.
 - A run-option to place the `PlatformIO` folder anywhere you want (and not inside the Arduino program folder).
 - More testing (f.i. does the `--project_dir` option works - never tested it myself).
+- Macros like
+  ```
+  #ifdef xyz
+      #include <libA.h>
+  #else
+      #include <libB.h>
+  #endif
+  ```
+  are not processed correctly and both libraries are included
 - More testing in general (what works and what does not work).
      
 ## Features

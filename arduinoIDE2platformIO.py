@@ -64,6 +64,7 @@ dict_includes             = {}
 platformio_marker         = "/PlatformIO"
 existingincludes_marker   = "//== Existing Includes =="
 localincludes_marker      = "//== Local Includes =="
+struct_marker             = "//== Structs & Unions =="
 externvariables_marker    = "//== Extern Variables =="
 externclasses_marker      = "//== Extern Classes =="
 prototypes_marker         = "//== Function Prototypes =="
@@ -822,16 +823,33 @@ default_envs = myBoard
 
 
 #------------------------------------------------------------------------------------------------------
+
+
 def move_struct_declarations():
     logging.info("")
     logging.info(f"Processing: move_struct_declarations() ")
 
     search_folders = [glob_pio_src, glob_pio_include]
 
+    def find_declaration_end(content, start_pos):
+        bracket_count = 0
+        for i, char in enumerate(content[start_pos:]):
+            if char == '{':
+                bracket_count += 1
+            elif char == '}':
+                bracket_count -= 1
+                if bracket_count == 0:
+                    # Look for the semicolon after the closing brace
+                    semicolon_pos = content.find(';', start_pos + i)
+                    if semicolon_pos != -1:
+                        return semicolon_pos + 1
+                    return start_pos + i + 1
+        return -1
+
     for folder in search_folders:
         for root, _, files in os.walk(folder):
             for file in files:
-                if file.endswith(('.h', '.ino')) and not file.startswith('arduinoGlue'):
+                if file.endswith(('.h', '.ino', '.cpp')) and not file.startswith('arduinoGlue'):
                     file_path = os.path.join(root, file)
                     logging.debug(f"\tProcessing file: {short_path(file_path)}")
 
@@ -839,61 +857,88 @@ def move_struct_declarations():
                         with open(file_path, 'r') as file:
                             content = file.read()
 
-                        # Regular expression to match struct declarations
-                        struct_pattern = r'(struct\s+(?:\w+\s+)*(?:\w+\s*)?{[^}]*})'
-
-                        # Find all struct declarations
-                        struct_declarations = re.finditer(struct_pattern, content, re.DOTALL | re.MULTILINE)
+                        # Regular expression to match struct and union declarations
+                        declaration_pattern = r'\b(struct|union)\s+(?:\w+\s+)*(?:\w+\s*)?{'
 
                         modified_content = content
-                        structs_to_move = []
+                        declarations_to_move = []
 
-                        for match in struct_declarations:
-                            struct_decl = match.group(1)
+                        for match in re.finditer(declaration_pattern, content):
+                            start_pos = match.start()
+                            end_pos = find_declaration_end(content, start_pos)
                             
-                            # Prepare the struct declaration for arduinoGlue.h
-                            arduinoGlue_struct = f"\t\t//-- from {os.path.basename(file_path)}\n{struct_decl}\n\n"
-                            structs_to_move.append(arduinoGlue_struct)
+                            if end_pos != -1:
+                                decl_type = match.group(1)  # 'struct' or 'union'
+                                decl = content[start_pos:end_pos]
+                                
+                                # Check if the declaration is globally defined (not inside a function)
+                                preceding_content = content[:start_pos]
+                                brace_level = preceding_content.count('{') - preceding_content.count('}')
+                                
+                                if brace_level == 0:  # Declaration is globally defined
+                                    # Prepare the declaration for arduinoGlue.h
+                                    arduinoGlue_decl = f"\t\t//-- from {os.path.basename(file_path)}\n{decl}\n\n"
+                                    declarations_to_move.append(arduinoGlue_decl)
 
-                            # Comment out the struct declaration in the original file
-                            commented_struct = f"/*\t\t\t\t\t--- struct moved to arduinoGlue.h ---\n{struct_decl}\n*/"
-
-                            modified_content = modified_content.replace(struct_decl, commented_struct)
+                                    # Comment out the declaration in the original file
+                                    comment_text = f"*** {decl_type} moved to arduinoGlue.h ***"
+                                    commented_decl = f"/*\t\t\t\t{comment_text}\n{decl}\n*/"
+                                    modified_content = modified_content.replace(content[start_pos:end_pos], commented_decl)
 
                         # Write modified content back to the original file (File Under Test)
                         with open(file_path, 'w') as file:
                             file.write(modified_content)
 
-                        # Insert struct declarations into arduinoGlue.h at the correct position
-                        arduinoGlue_path = os.path.join(glob_pio_include, 'arduinoGlue.h')
-                        with open(arduinoGlue_path, 'r+') as file:
-                            arduinoGlue_content = file.read()
-                            
-                            # Find the correct insertion point
-                            last_include = arduinoGlue_content.rfind('#include')
-                            last_define = arduinoGlue_content.rfind('#define')
-                            header_guard = arduinoGlue_content.find('#ifndef')
-                            
-                            if last_include != -1:
-                                insert_point = arduinoGlue_content.find('\n', last_include) + 1
-                            elif last_define != -1:
-                                insert_point = arduinoGlue_content.find('\n', last_define) + 1
-                            elif header_guard != -1:
-                                insert_point = arduinoGlue_content.find('\n', header_guard) + 1
-                            else:
-                                insert_point = 0
-                            
-                            # Insert the struct declarations
-                            new_content = (arduinoGlue_content[:insert_point] + '\n' +
-                                          '\n'.join(structs_to_move) +
-                                          arduinoGlue_content[insert_point:])
-                            
-                            # Write the updated content back to arduinoGlue.h
-                            file.seek(0)
-                            file.write(new_content)
-                            file.truncate()
+                        # Insert declarations into arduinoGlue.h at the correct position
+                        if declarations_to_move:
+                            arduinoGlue_path = os.path.join(glob_pio_include, 'arduinoGlue.h')
+                            with open(arduinoGlue_path, 'r+') as file:
+                                arduinoGlue_content = file.read()
+                                
+                                # Find the correct insertion point
+                                header_guard_match = re.search(r'#ifndef\s+\w+\s+#define\s+\w+', arduinoGlue_content)
+                                if header_guard_match:
+                                    header_guard_end = header_guard_match.end()
+                                    """
+                                    # Find the last #define after the header guard
+                                    last_define = arduinoGlue_content.rfind('#define', header_guard_end)
+                                    if last_define != -1:
+                                        insert_point = arduinoGlue_content.find('\n', last_define) + 1
+                                    else:
+                                        # If no #define found, insert after header guard
+                                        insert_point = arduinoGlue_content.find('\n', header_guard_end) + 1
+                                    """
+                                    # Find the struct_marker after the header guard
+                                    struct_marker_pos = arduinoGlue_content.rfind(f"{struct_marker}", header_guard_end)
+                                    logging.info(f"\t\tstruct_marker_pos: {struct_marker_pos}")
+                                    if struct_marker_pos != -1:
+                                        insert_point = arduinoGlue_content.find('\n', struct_marker_pos) + 1
+                                    else:
+                                        # If no #define found, insert after header guard
+                                        insert_point = arduinoGlue_content.find('\n', header_guard_end) + 1
+                                else:
+                                    # If no header guard found, insert at the beginning
+                                    insert_point = 0
+                                logging.info(f"\t\tinsert_point: {insert_point}")
 
-                        logging.info(f"\tMoved {len(structs_to_move)} struct declaration(s) from [{os.path.basename(file_path)}] to arduinoGlue.h")
+                                # Ensure there's an empty line before the declarations
+                                if insert_point > 0 and arduinoGlue_content[insert_point-1] != '\n':
+                                    new_content = (arduinoGlue_content[:insert_point] + '\n\n' +
+                                                  '\n'.join(declarations_to_move) +
+                                                  arduinoGlue_content[insert_point:])
+                                else:
+                                    new_content = (arduinoGlue_content[:insert_point] + '\n' +
+                                                  '\n'.join(declarations_to_move) +
+                                                  arduinoGlue_content[insert_point:])
+                                
+                                # Write the updated content back to arduinoGlue.h
+                                file.seek(0)
+                                file.write(new_content)
+                                file.truncate()
+
+                            logging.info(f"\tMoved {len(declarations_to_move)} struct/union declaration(s) from [{os.path.basename(file_path)}] to arduinoGlue.h")
+                        else:
+                            logging.info(f"\tNo global struct/union declarations found in [{os.path.basename(file_path)}]")
 
                     except FileNotFoundError:
                         logging.error(f"Error: File {file_path} not found.")
@@ -903,7 +948,7 @@ def move_struct_declarations():
                         exc_type, exc_obj, exc_tb = sys.exc_info()
                         line_number = exc_tb.tb_lineno
                         logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
-        
+
 #------------------------------------------------------------------------------------------------------
 def extract_and_comment_defines():
     """
@@ -990,6 +1035,13 @@ def extract_and_comment_defines():
             f.write("#ifndef ARDUINOGLUE_H\n#define ARDUINOGLUE_H\n\n")
             for macro_name, macro_value in all_defines:
                 f.write(f"{macro_value}\n\n")
+            f.write(f"{existingincludes_marker}\n\n")
+            f.write(f"{localincludes_marker}\n\n")
+            f.write(f"{struct_marker}\n\n")
+            f.write(f"{externvariables_marker}\n\n")
+            f.write(f"{externclasses_marker}\n\n")
+            f.write(f"{prototypes_marker}\n\n")
+            f.write(f"{convertor_marker}\n\n")
             f.write("#endif // ARDUINOGLUE_H\n")
 
         logging.info(f"\tSuccessfully created {short_path(all_defines_path)}")
@@ -1802,8 +1854,19 @@ def update_arduino_glue(dict_all_includes, dict_global_variables, dict_prototype
         glue_path = os.path.join(glob_pio_include, "arduinoGlue.h")
         with open(glue_path, "r") as file:
             content = file.read()
-
+        """
         insert_pos = content.rfind("#define")
+        if insert_pos != -1:
+            insert_pos = content.find("\n", insert_pos) + 1
+        else:
+            insert_pos = content.find("#endif")
+            if insert_pos != -1:
+                insert_pos = content.rfind("\n", 0, insert_pos) + 1
+            else:
+                insert_pos = len(content)
+        """
+        insert_pos = content.rfind(struct_marker)
+        logging.info(f"update_arduinoGlue(): insert_pos = {insert_pos}")
         if insert_pos != -1:
             insert_pos = content.find("\n", insert_pos) + 1
         else:
