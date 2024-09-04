@@ -62,13 +62,18 @@ dict_class_instances      = {}
 dict_struct_declarations  = {}
 dict_includes             = {}
 platformio_marker         = "/PlatformIO"
-existingincludes_marker   = "//== Existing Includes =="
-localincludes_marker      = "//== Local Includes =="
-struct_marker             = "//== Structs & Unions =="
-externvariables_marker    = "//== Extern Variables =="
-externclasses_marker      = "//== Extern Classes =="
-prototypes_marker         = "//== Function Prototypes =="
-convertor_marker          = "//== Added by Convertor =="
+all_includes_marker       = "//============ Includes ===================="
+all_includes_added        = False
+struct_and_union_marker   = "//============ Structs & Unions ============"
+struct_and_union_added    = False
+extern_variables_marker   = "//============ Extern Variables ============"
+extern_variables_added    = False
+extern_classes_marker     = "//============ Extern Classes =============="
+extern_classes_added      = False
+prototypes_marker         = "//============ Function Prototypes ========="
+prototypes_added         = False
+convertor_marker          = "//============ Added by Convertor =========="
+convertor_added          = False
 
 #------------------------------------------------------------------------------------------------------
 def setup_logging(debug=False):
@@ -200,12 +205,12 @@ def find_marker_position(content, prio_marker):
         if marker_index != -1:
             return marker_index + len(marker +'\n')
         
-        marker = localincludes_marker
+        marker = all_includes_marker
         marker_index = content.find(marker)
         if marker_index != -1:
             return marker_index + len(marker +'\n')
         
-        marker = externvariables_marker
+        marker = extern_variables_marker
         marker_index = content.find(marker)
         if marker_index != -1:
             return marker_index + len(marker +'\n')
@@ -225,7 +230,7 @@ def find_marker_position(content, prio_marker):
         if header_guard_end:
             return header_guard_end.end()
 
-        loggin.info("")
+        logging.info("")
         logging.info("################################### no markers found! ##################################")
         logging.info(f"{content}\n")
         logging.info("################################### no markers found! ##################################\n\n")
@@ -823,11 +828,11 @@ default_envs = myBoard
 
 
 #------------------------------------------------------------------------------------------------------
-
-
-def move_struct_declarations():
+def move_struct_and_union_declarations():
     logging.info("")
-    logging.info(f"Processing: move_struct_declarations() ")
+    logging.info(f"Processing: move_struct_and_union_declarations() ")
+
+    global struct_and_union_added
 
     search_folders = [glob_pio_src, glob_pio_include]
 
@@ -849,7 +854,8 @@ def move_struct_declarations():
     for folder in search_folders:
         for root, _, files in os.walk(folder):
             for file in files:
-                if file.endswith(('.h', '.ino', '.cpp')) and not file.startswith('arduinoGlue'):
+                #??#if file.endswith(('.h', '.ino', '.cpp')) and not file.startswith('arduinoGlue'):
+                if file.endswith(('.h', '.ino')) and not file.startswith('arduinoGlue'):
                     file_path = os.path.join(root, file)
                     logging.debug(f"\tProcessing file: {short_path(file_path)}")
 
@@ -877,13 +883,14 @@ def move_struct_declarations():
                                 
                                 if brace_level == 0:  # Declaration is globally defined
                                     # Prepare the declaration for arduinoGlue.h
-                                    arduinoGlue_decl = f"\t\t//-- from {os.path.basename(file_path)}\n{decl}\n\n"
+                                    arduinoGlue_decl = f"//-- from {os.path.basename(file_path)}\n{decl}"
                                     declarations_to_move.append(arduinoGlue_decl)
 
                                     # Comment out the declaration in the original file
                                     comment_text = f"*** {decl_type} moved to arduinoGlue.h ***"
                                     commented_decl = f"/*\t\t\t\t{comment_text}\n{decl}\n*/"
                                     modified_content = modified_content.replace(content[start_pos:end_pos], commented_decl)
+                                    struct_and_union_added = True
 
                         # Write modified content back to the original file (File Under Test)
                         with open(file_path, 'w') as file:
@@ -899,20 +906,11 @@ def move_struct_declarations():
                                 header_guard_match = re.search(r'#ifndef\s+\w+\s+#define\s+\w+', arduinoGlue_content)
                                 if header_guard_match:
                                     header_guard_end = header_guard_match.end()
-                                    """
-                                    # Find the last #define after the header guard
-                                    last_define = arduinoGlue_content.rfind('#define', header_guard_end)
-                                    if last_define != -1:
-                                        insert_point = arduinoGlue_content.find('\n', last_define) + 1
-                                    else:
-                                        # If no #define found, insert after header guard
-                                        insert_point = arduinoGlue_content.find('\n', header_guard_end) + 1
-                                    """
-                                    # Find the struct_marker after the header guard
-                                    struct_marker_pos = arduinoGlue_content.rfind(f"{struct_marker}", header_guard_end)
-                                    logging.info(f"\t\tstruct_marker_pos: {struct_marker_pos}")
-                                    if struct_marker_pos != -1:
-                                        insert_point = arduinoGlue_content.find('\n', struct_marker_pos) + 1
+                                    # Find the struct_and_union_marker after the header guard
+                                    struct_and_union_marker_pos = arduinoGlue_content.rfind(f"{struct_and_union_marker}", header_guard_end)
+                                    logging.info(f"\t\tstruct_and_union_marker_pos: {struct_and_union_marker_pos}")
+                                    if struct_and_union_marker_pos != -1:
+                                        insert_point = arduinoGlue_content.find('\n', struct_and_union_marker_pos) + 0
                                     else:
                                         # If no #define found, insert after header guard
                                         insert_point = arduinoGlue_content.find('\n', header_guard_end) + 1
@@ -921,15 +919,10 @@ def move_struct_declarations():
                                     insert_point = 0
                                 logging.info(f"\t\tinsert_point: {insert_point}")
 
-                                # Ensure there's an empty line before the declarations
-                                if insert_point > 0 and arduinoGlue_content[insert_point-1] != '\n':
-                                    new_content = (arduinoGlue_content[:insert_point] + '\n\n' +
-                                                  '\n'.join(declarations_to_move) +
-                                                  arduinoGlue_content[insert_point:])
-                                else:
-                                    new_content = (arduinoGlue_content[:insert_point] + '\n' +
-                                                  '\n'.join(declarations_to_move) +
-                                                  arduinoGlue_content[insert_point:])
+                                # Ensure there's an empty line before the declarations and one after each declaration
+                                new_content = arduinoGlue_content[:insert_point] + '\n'
+                                new_content += '\n'.join(decl + '\n' for decl in declarations_to_move)
+                                new_content += arduinoGlue_content[insert_point:]
                                 
                                 # Write the updated content back to arduinoGlue.h
                                 file.seek(0)
@@ -948,6 +941,7 @@ def move_struct_declarations():
                         exc_type, exc_obj, exc_tb = sys.exc_info()
                         line_number = exc_tb.tb_lineno
                         logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
+                        exit()
 
 #------------------------------------------------------------------------------------------------------
 def extract_and_comment_defines():
@@ -956,21 +950,21 @@ def extract_and_comment_defines():
     create arduinoGlue.h, and comment original statements with info.
     """
     logging.info("")
-    all_defines = []
-    define_pattern = r'^\s*#define\s+(\w+)(?:\(.*?\))?\s*(.*?)(?:(?=\\\n)|$)'
-
     logging.info(f"Searching for #define statements in {short_path(glob_pio_folder)}")
 
-    # Only search within glob_pio_src and glob_pio_include folders
-    search_folders = [glob_pio_src, glob_pio_include]
+    try:
+        all_defines = []
+        define_pattern = r'^\s*#define\s+(\w+)(?:\(.*?\))?\s*(.*?)(?:(?=\\\n)|$)'
 
-    for folder in search_folders:
-        for root, _, files in os.walk(folder):
-            for file in files:
-                if file.endswith(('.h', '.ino')):
-                    file_path = os.path.join(root, file)
-                    logging.debug(f"\tProcessing file: {short_path(file_path)}")
-                    try:
+        # Only search within glob_pio_src and glob_pio_include folders
+        search_folders = [glob_pio_src, glob_pio_include]
+
+        for folder in search_folders:
+            for root, _, files in os.walk(folder):
+                for file in files:
+                    if file.endswith(('.h', '.ino')):
+                        file_path = os.path.join(root, file)
+                        logging.debug(f"\tProcessing file: {short_path(file_path)}")
                         with open(file_path, 'r') as f:
                             content = f.read()
 
@@ -991,7 +985,7 @@ def extract_and_comment_defines():
                                     next_line = lines[i]
                                     full_define.append(next_line)
                                     macro_value += '\n' + next_line.strip()
-
+                                    
                                 # Add the closing line if it's not already included
                                 if i + 1 < len(lines) and not macro_value.endswith('\\'):
                                     i += 1
@@ -1019,30 +1013,20 @@ def extract_and_comment_defines():
                             f.write('\n'.join(new_content))
                         logging.debug(f"\tUpdated {file} with commented out #defines")
 
-                    except Exception as e:
-                        exc_type, exc_obj, exc_tb = sys.exc_info()
-                        #fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                        line_number = exc_tb.tb_lineno
-                        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
-                        logging.error(f"\tError processing file {file}: {str(e)}")
-                        exit()
-
-    # Create arduinoGlue.h with all macros
-    all_defines_path = os.path.join(glob_pio_include, 'arduinoGlue.h')
-    logging.info(f"\tCreating arduinoGlue.h with {len(all_defines)} macros")
-    try:
+        # Create arduinoGlue.h with all macros
+        all_defines_path = os.path.join(glob_pio_include, 'arduinoGlue.h')
+        logging.info(f"\tCreating arduinoGlue.h with {len(all_defines)} macros")
         with open(all_defines_path, 'w') as f:
             f.write("#ifndef ARDUINOGLUE_H\n#define ARDUINOGLUE_H\n\n")
             for macro_name, macro_value in all_defines:
-                f.write(f"{macro_value}\n\n")
-            f.write(f"{existingincludes_marker}\n\n")
-            f.write(f"{localincludes_marker}\n\n")
-            f.write(f"{struct_marker}\n\n")
-            f.write(f"{externvariables_marker}\n\n")
-            f.write(f"{externclasses_marker}\n\n")
-            f.write(f"{prototypes_marker}\n\n")
-            f.write(f"{convertor_marker}\n\n")
-            f.write("#endif // ARDUINOGLUE_H\n")
+                f.write(f"{macro_value}\n")
+            f.write(f"\n{all_includes_marker}")
+            f.write(f"\n{struct_and_union_marker}")
+            f.write(f"\n\n{extern_variables_marker}")
+            f.write(f"\n{extern_classes_marker}")
+            f.write(f"\n{prototypes_marker}")
+            f.write(f"\n{convertor_marker}")
+            f.write("\n#endif // ARDUINOGLUE_H\n")
 
         logging.info(f"\tSuccessfully created {short_path(all_defines_path)}")
 
@@ -1067,11 +1051,7 @@ def add_markers_to_header_file(file_path):
 
         markers = [
             convertor_marker,
-            #existingincludes_marker,
-            localincludes_marker,
-            #externvariables_marker,
-            #externclasses_marker,
-            #prototypes_marker
+            all_includes_marker,
         ]
 
         lines = content.split('\n')
@@ -1148,7 +1128,7 @@ def create_new_header_file(ino_name, header_name):
         with open(header_path, 'w') as f:
             f.write(f"#ifndef {base_name.upper()}_H\n")
             f.write(f"#define {base_name.upper()}_H\n\n")
-            f.write(f"{localincludes_marker}")
+            f.write(f"{all_includes_marker}")
             f.write("\n")
             f.write("#include \"arduinoGlue.h\"\n\n")
             f.write(f"{convertor_marker}")
@@ -1169,52 +1149,59 @@ def create_new_header_file(ino_name, header_name):
 def process_original_header_file(header_path, base_name):
     logging.info(f"Processing: process_original_header_file(): [{base_name}]")
     
-    if os.path.exists(header_path):
-        with open(header_path, 'r') as f:
-            original_content = f.read()
-        
-        # Check for existing header guards
-        guard_match = re.search(r'#ifndef\s+(\w+_H).*?#define\s+\1', original_content, re.DOTALL)
-        has_guards = guard_match is not None
-
-        new_content = original_content
-
-        if not has_guards:
-            # Add header guards if they don't exist
-            logging.debug(f"\tAdding header guards for {base_name}")
-            guard_name = f"{base_name.upper()}_H"
-            new_content = f"#ifndef {guard_name}\n#define {guard_name}\n\n{new_content}\n#endif // {guard_name}\n"
-        else:
-            guard_name = guard_match.group(1)
-
-        # Find the position to insert the localincludes_marker
-        if localincludes_marker not in new_content:
-            logging.debug(f"\tAdding {localincludes_marker} to {base_name}")
-            # Find the first closing comment after the header guard
-            comment_end = new_content.find('*/', new_content.find(guard_name)) + 2
-            if comment_end > 1:  # If a closing comment was found
-                insert_pos = comment_end
-            else:  # If no closing comment, insert after the header guard
-                insert_pos = new_content.find('\n', new_content.find(guard_name)) + 1
+    try:
+        if os.path.exists(header_path):
+            with open(header_path, 'r') as f:
+                original_content = f.read()
             
-            new_content = new_content[:insert_pos] + f"\n{localincludes_marker}\n" + new_content[insert_pos:]
+            # Check for existing header guards
+            guard_match = re.search(r'#ifndef\s+(\w+_H).*?#define\s+\1', original_content, re.DOTALL)
+            has_guards = guard_match is not None
 
-        # Check if arduinoGlue.h is already included
-        if '#include "arduinoGlue.h"' not in new_content:
-            logging.debug(f"\tAdding arduinoGlue.h include to {base_name}")
-            # Insert after the convertor_marker
-            insert_pos = new_content.find('\n', new_content.find(localincludes_marker)) + 1
-            new_content = new_content[:insert_pos] + '#include "arduinoGlue.h"\n\n' + new_content[insert_pos:]
+            new_content = original_content
 
-        # Only write to the file if changes were made
-        if new_content != original_content:
-            with open(header_path, 'w') as f:
-                f.write(new_content)
-            logging.debug(f"\tUpdated original header file: {short_path(header_path)}")
+            if not has_guards:
+                # Add header guards if they don't exist
+                logging.debug(f"\tAdding header guards for {base_name}")
+                guard_name = f"{base_name.upper()}_H"
+                new_content = f"#ifndef {guard_name}\n#define {guard_name}\n\n{new_content}\n#endif // {guard_name}\n"
+            else:
+                guard_name = guard_match.group(1)
+
+            # Find the position to insert the all_includes_marker
+            if all_includes_marker not in new_content:
+                logging.debug(f"\tAdding {all_includes_marker} to {base_name}")
+                # Find the first closing comment after the header guard
+                comment_end = new_content.find('*/', new_content.find(guard_name)) + 2
+                if comment_end > 1:  # If a closing comment was found
+                    insert_pos = comment_end
+                else:  # If no closing comment, insert after the header guard
+                    insert_pos = new_content.find('\n', new_content.find(guard_name)) + 1
+                
+                new_content = new_content[:insert_pos] + f"\n{all_includes_marker}\n" + new_content[insert_pos:]
+
+            # Check if arduinoGlue.h is already included
+            if '#include "arduinoGlue.h"' not in new_content:
+                logging.debug(f"\tAdding arduinoGlue.h include to {base_name}")
+                # Insert after the convertor_markerloca
+                insert_pos = new_content.find('\n', new_content.find(all_includes_marker)) + 1
+                new_content = new_content[:insert_pos] + '#include "arduinoGlue.h"\n\n' + new_content[insert_pos:]
+
+            # Only write to the file if changes were made
+            if new_content != original_content:
+                with open(header_path, 'w') as f:
+                    f.write(new_content)
+                logging.debug(f"\tUpdated original header file: {short_path(header_path)}")
+            else:
+                logging.debug(f"\tNo changes needed for: {short_path(header_path)}")
         else:
-            logging.debug(f"\tNo changes needed for: {short_path(header_path)}")
-    else:
-        logging.debug(f"\tFile not found: {short_path(header_path)}")
+            logging.debug(f"\tFile not found: {short_path(header_path)}")
+
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        line_number = exc_tb.tb_lineno
+        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
+        exit()
 
     return header_path
 
@@ -1263,7 +1250,7 @@ def add_local_includes_to_project_header():
         logging.debug(f"\tFound {len(new_includes)} new includes: {', '.join(new_includes)}")
 
         # Find the insertion point
-        marker = localincludes_marker
+        marker = all_includes_marker
         insertion_point = content.find(marker)
         if insertion_point == -1:
             marker = convertor_marker
@@ -1300,36 +1287,44 @@ def copy_project_files():
     logging.info("")
     logging.info("Processing: copy_project_files() ..")
 
-    # Check if the file exists
-    arduinoGlue_path = os.path.join(glob_pio_include, "arduinoGlue.h")
-    if os.path.exists(arduinoGlue_path):
-        # Delete the file
-        os.remove(arduinoGlue_path)
-        logging.info("\t'arduinoGlue.h' has been deleted.")
-    else:
-       logging.info("\t'arduinoGlue.h' does not (yet) exist.")
+    try:
+        # Remove the arduinoGlue.h file
+        # Check if the file exists
+        arduinoGlue_path = os.path.join(glob_pio_include, "arduinoGlue.h")
+        if os.path.exists(arduinoGlue_path):
+            # Delete the file
+            os.remove(arduinoGlue_path)
+            logging.info("\t'arduinoGlue.h' has been deleted.")
+        else:
+          logging.info("\t'arduinoGlue.h' does not (yet) exist.")
 
-    for file in os.listdir(glob_ino_project_folder):
-        if file.endswith('.ino'):
-            logging.debug(f"\tCopy [{file}] ..")
-            shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_src)
-        elif file.endswith('.cpp'):
-            logging.debug(f"\tCopy [{file}] ..")
-            shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_src)
-        elif file.endswith('.c'):
-            logging.debug(f"\tCopy [{file}] ..")
-            shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_src)
-        elif file.endswith('.h'):
-            logging.debug(f"\tCopy [{file}] ..")
-            shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_include)
-            logging.info(f"\tProcessing original header file: {file}")
-            base_name = os.path.splitext(file)[0]
-            header_path = os.path.join(glob_pio_include, f"{base_name}.h")
-            process_original_header_file(header_path, base_name)
+        for file in os.listdir(glob_ino_project_folder):
+            if file.endswith('.ino'):
+                logging.debug(f"\tCopy [{file}] ..")
+                shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_src)
+            elif file.endswith('.cpp'):
+                logging.debug(f"\tCopy [{file}] ..")
+                shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_src)
+            elif file.endswith('.c'):
+                logging.debug(f"\tCopy [{file}] ..")
+                shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_src)
+            elif file.endswith('.h'):
+                logging.debug(f"\tCopy [{file}] ..")
+                shutil.copy2(os.path.join(glob_ino_project_folder, file), glob_pio_include)
+                logging.info(f"\tProcessing original header file: {file}")
+                base_name = os.path.splitext(file)[0]
+                header_path = os.path.join(glob_pio_include, f"{base_name}.h")
+                process_original_header_file(header_path, base_name)
 
-    if args.debug:
-        list_files_in_directory(glob_pio_src)
-        list_files_in_directory(glob_pio_include)
+        if args.debug:
+            list_files_in_directory(glob_pio_src)
+            list_files_in_directory(glob_pio_include)
+
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        line_number = exc_tb.tb_lineno
+        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
+        exit()
 
     logging.debug("\tCopied project files to PlatformIO folders")
 
@@ -1845,48 +1840,54 @@ def extract_class_instances(file_path):
     return class_instances
 
 #------------------------------------------------------------------------------------------------------
-def update_arduino_glue(dict_all_includes, dict_global_variables, dict_prototypes):
-    
+def update_arduinoglue_with_includes(dict_all_includes):
     logging.info("")
-    logging.info("Processing: update_arduino_glue()")
+    logging.info("Processing: update_arduinoglue_with_includes()")
+
+    global all_includes_added
 
     try:
         glue_path = os.path.join(glob_pio_include, "arduinoGlue.h")
         with open(glue_path, "r") as file:
             content = file.read()
-        """
-        insert_pos = content.rfind("#define")
-        if insert_pos != -1:
-            insert_pos = content.find("\n", insert_pos) + 1
-        else:
-            insert_pos = content.find("#endif")
-            if insert_pos != -1:
-                insert_pos = content.rfind("\n", 0, insert_pos) + 1
-            else:
-                insert_pos = len(content)
-        """
-        insert_pos = content.rfind(struct_marker)
-        logging.info(f"update_arduinoGlue(): insert_pos = {insert_pos}")
-        if insert_pos != -1:
-            insert_pos = content.find("\n", insert_pos) + 1
-        else:
-            insert_pos = content.find("#endif")
-            if insert_pos != -1:
-                insert_pos = content.rfind("\n", 0, insert_pos) + 1
-            else:
-                insert_pos = len(content)
 
-        new_content = content[:insert_pos] + "\n"
+        insert_pos = find_marker_position(content, all_includes_marker)
+        
+        new_content = content[:insert_pos] # + "\n"
 
-        dict_name = "dict_all_includes"
-        new_content += f"//-- {dict_name} ---\n"
         for include in dict_all_includes:
             logging.debug(f"Added:\t{include}")
             new_content += f"{include}\n"
+            all_includes_added = True
         new_content += "\n"
 
-        dict_name = "dict_global_variables"
-        new_content += f"//-- {dict_name} ---\n"
+        new_content += content[insert_pos:]
+
+        with open(glue_path, "w") as file:
+            file.write(new_content)
+
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        line_number = exc_tb.tb_lineno
+        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
+        exit()
+
+#------------------------------------------------------------------------------------------------------
+def update_arduinoglue_with_global_variables(dict_global_variables):
+    logging.info("")
+    logging.info("Processing: update_arduinoglue_with_global_variables()")
+
+    global extern_variables_added
+
+    try:
+        glue_path = os.path.join(glob_pio_include, "arduinoGlue.h")
+        with open(glue_path, "r") as file:
+            content = file.read()
+
+        insert_pos = find_marker_position(content, extern_variables_marker)
+        
+        new_content = content[:insert_pos] # + "\n"
+
         sorted_global_vars = sort_global_vars(dict_global_variables)
         for file_path, vars_list in sorted_global_vars.items():
             if vars_list:  # Only print for files that have global variables
@@ -1894,10 +1895,36 @@ def update_arduino_glue(dict_all_includes, dict_global_variables, dict_prototype
                     var_name += ';'
                     logging.debug(f"Added:\textern {var_type:<15} {var_name:<35}\t\t//-- from {file_path})")
                     new_content += (f"extern {var_type:<15} {var_name:<35}\t\t//-- from {file_path}\n")
+                    extern_variables_added = True
         new_content += "\n"
 
-        dict_name = "dict_prototypes"
-        new_content += f"//-- {dict_name} ---\n"
+        new_content += content[insert_pos:]
+
+        with open(glue_path, "w") as file:
+            file.write(new_content)
+
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        line_number = exc_tb.tb_lineno
+        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
+        exit()
+
+#------------------------------------------------------------------------------------------------------
+def update_arduinoglue_with_prototypes(dict_prototypes):
+    logging.info("")
+    logging.info("Processing: update_arduinoglue_with_prototypes()")
+
+    global prototypes_added
+
+    try:
+        glue_path = os.path.join(glob_pio_include, "arduinoGlue.h")
+        with open(glue_path, "r") as file:
+            content = file.read()
+
+        insert_pos = find_marker_position(content, prototypes_marker)
+        
+        new_content = content[:insert_pos] # + "\n"
+
         sav_file = ""
         for key, value in dict_prototypes.items():
             func_name, params = key
@@ -1906,6 +1933,7 @@ def update_arduino_glue(dict_all_includes, dict_global_variables, dict_prototype
                 sav_file = file_name
                 logging.debug(f"Added:\t//-- from {file_name} ----------")
                 new_content += (f"//-- from {file_name} -----------\n")
+                prototypes_added = True
             prototype_sm = prototype + ';'
             logging.debug(f"Added:\t{prototype_sm}")
             new_content += (f"{prototype_sm:<60}\n")
@@ -1920,7 +1948,71 @@ def update_arduino_glue(dict_all_includes, dict_global_variables, dict_prototype
         exc_type, exc_obj, exc_tb = sys.exc_info()
         line_number = exc_tb.tb_lineno
         logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
-        exit()        
+        exit()
+
+#------------------------------------------------------------------------------------------------------
+def remove_unused_markers_from_arduinoGlue():
+    logging.info("Processing: remove_unused_markers_from_arduinoGlue()")
+    glue_path = os.path.join(glob_pio_include, "arduinoGlue.h")
+    logging.info(f"GluePath: {glue_path}")
+
+    try:
+        with open(glue_path, 'r') as file:
+            content = file.read()
+
+        #debug#logging.info("File content:")
+        #debug#logging.info(content)
+
+        original_content = content  # Store original content for comparison
+
+        markers = {
+            all_includes_marker: 'all_includes_added',
+            struct_and_union_marker: 'struct_and_union_added',
+            extern_variables_marker: 'extern_variables_added',
+            extern_classes_marker: 'extern_classes_added',
+            prototypes_marker: 'prototypes_added',
+            convertor_marker: 'convertor_added'
+        }
+
+        # Create a list of all markers for the regex pattern
+        all_markers = '|'.join(re.escape(m) for m in markers.keys())
+
+        for marker, test_var in markers.items():
+            logging.info(f"\tChecking marker: {marker}")
+            if not globals().get(test_var, False):
+                logging.info(f"\tRemoving unused marker: {marker}")
+                # Pattern to match from this marker to the next marker or #endif
+                pattern = f'({re.escape(marker)}).*?(?={all_markers}|#endif)'
+                #debug#logging.info(f"\tSearch pattern: {pattern}")
+                matches = re.findall(pattern, content, flags=re.DOTALL)
+                if matches:
+                    for match in matches:
+                        logging.debug(f"\tFound match: {match}")
+                    new_content = re.sub(pattern, '', content, flags=re.DOTALL)
+                    if new_content != content:
+                        logging.debug(f"\tMarker {marker} successfully removed")
+                        content = new_content
+                    else:
+                        logging.info(f"\tNo change for marker {marker} despite matches")
+                else:
+                    logging.info(f"\tNo matches found for marker {marker}")
+
+        # Ensure we keep the #endif line
+        if '#endif' not in content:
+            content += '\n#endif // ARDUINOGLUE_H\n'
+
+        if content != original_content:
+            with open(glue_path, 'w') as file:
+                file.write(content)
+            logging.info("File updated 'arduinoGlue.h'successfully")
+        else:
+            logging.info("No changes were necessary for 'arduinoGlue.h'")
+
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        line_number = exc_tb.tb_lineno
+        logging.error(f"An error occurred at line {line_number}: {str(e)}")
+        exit()
 
 #------------------------------------------------------------------------------------------------------
 def insert_class_instances_to_header_files(file_name):
@@ -1942,7 +2034,7 @@ def insert_class_instances_to_header_files(file_name):
                 file_name = os.path.splitext(header_base)[0]
                 f.write(f"#ifndef _{file_name.upper()}_H_\n")
                 f.write(f"#define _{file_name.upper()}_H_\n\n")
-                f.write(f"{localincludes_marker}\n\n")
+                f.write(f"{all_includes_marker}\n\n")
                 f.write(f"#endif // _{file_name.upper()}_H_\n")
             logging.info(f"\tCreated header file: {short_path(header_file)}")
         
@@ -1997,7 +2089,7 @@ def insert_class_instances_to_header_files(file_name):
 
         logging.info(f"includes to add: {includes_to_add}")
         # Find the position to insert the new includes and insert them
-        insert_pos = find_marker_position(header_content, localincludes_marker)
+        insert_pos = find_marker_position(header_content, all_includes_marker)
         if insert_pos != -1:
             new_includes = '\n'.join(includes_to_add)
             logging.info(f"\t\tnew includes: [{new_includes}]")
@@ -2009,7 +2101,7 @@ def insert_class_instances_to_header_files(file_name):
         else:
             updated_content = header_content
             insert_pos = 0
-            logging.warning(f"\t\tCould not find marker {localincludes_marker} in {short_path(header_file)}")
+            logging.warning(f"\t\tCould not find marker {all_includes_marker} in {short_path(header_file)}")
 
         # Write the updated content back to the .h file
         with open(header_file, 'w') as f:
@@ -2134,10 +2226,10 @@ def find_undefined_functions_and_update_headers(glob_pio_src, glob_pio_include, 
 
                 if new_includes:
                     # Find the position to insert new includes
-                    marker = externclasses_marker
+                    marker = extern_classes_marker
                     insert_pos = header_content.find(f"{marker}")
                     if insert_pos == -1:
-                        marker = localincludes_marker
+                        marker = all_includes_marker
                         insert_pos = header_content.find(f"{marker}")
                         if insert_pos == -1:
                             marker = convertor_marker
@@ -2166,7 +2258,7 @@ def find_undefined_functions_and_update_headers(glob_pio_src, glob_pio_include, 
                     for include in new_includes:
                         logging.info(f"  - {include}")
                 else:
-                    logging.warning(f"\tCould not find '{localincludes_marker}' in {short_header_path}")
+                    logging.warning(f"\tCould not find '{all_includes_marker}' in {short_header_path}")
             else:
                 logging.info(f"\tNo new includes needed for {short_header_path}")
         else:
@@ -2367,7 +2459,7 @@ def update_project_header(glob_pio_include, glob_project_name, original_content)
 
     # Process each section
     for i, section in enumerate(sections):
-        if section.strip() == f"{localincludes_marker}":
+        if section.strip() == f"{all_includes_marker}":
             # Add new local includes here
             new_content.append(section + "\n")
             for file in os.listdir(glob_pio_include):
@@ -2442,7 +2534,7 @@ def main():
         copy_data_folder()
         create_platformio_ini()
         extract_and_comment_defines()
-        move_struct_declarations()
+        move_struct_and_union_declarations()
 
 
         search_folders = [glob_pio_src, glob_pio_include]
@@ -2494,7 +2586,9 @@ def main():
         print_prototypes(dict_prototypes)
 
         logging.info("And now add all dict's to arduinoGlue.h:")
-        update_arduino_glue(dict_all_includes, dict_global_variables, dict_prototypes)
+        update_arduinoglue_with_includes(dict_all_includes)
+        update_arduinoglue_with_global_variables(dict_global_variables)
+        update_arduinoglue_with_prototypes(dict_prototypes)
 
         logging.info("")
         logging.info("=======================================================================================================")
@@ -2534,6 +2628,8 @@ def main():
                 rename_file(ino_path, cpp_path)
                 insert_header_include_in_cpp(cpp_path)
 
+        remove_unused_markers_from_arduinoGlue()
+        
         logging.info("")
         logging.info("*************************************************************")
         logging.info("** Arduino to PlatformIO conversion completed successfully **")
