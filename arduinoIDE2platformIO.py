@@ -64,8 +64,10 @@ dict_includes             = {}
 platformio_marker         = "/PlatformIO"
 all_includes_marker       = "//============ Includes ===================="
 all_includes_added        = False
-struct_and_union_marker   = "//============ Structs & Unions ============"
-struct_and_union_added    = False
+struct_union_and_enum_marker  = "//============ Structs, Unions & Enums ============"
+struct_union_and_enum_added        = False
+global_pointer_arrays_marker  = "//============ Pointer Arrays ============"
+global_pointer_arrays_added = False
 extern_variables_marker   = "//============ Extern Variables ============"
 extern_variables_added    = False
 extern_classes_marker     = "//============ Extern Classes =============="
@@ -771,24 +773,47 @@ default_envs = myBoard
 ;-- esp32
 #platform = espressif32
 #board = esp32dev
+#framework = arduino
+#board_build.partitions = <min_spiffs.csv>
+#board_build.filesystem = <LittleFS>|<SPIFFS>
+#monitor_speed = 115200
+#upload_speed = 115200
+#build_flags =
+#\t-D DEBUG
+#
+#lib_ldf_mode = deep+
+#
+#lib_deps =
+;\t<select libraries with "PIO Home" -> Libraries
+
 ##-- you NEED the next line (with the correct port)
 ##-- or the data upload will NOT work!
-#upload_port = /dev/serial_port
-#board_build.partitions = min_spiffs.csv
-#board_build.filesystem = SPIFFS
+#upload_port = </dev/serial_port>
+#monitor_filters =
+#  esp32_exception_decoder
 
 ;-- esp8266
 #platform = espressif8266
 #board = esp12e
+#framework = arduino
 ##-- you NEED the next line (with the correct port)
 ##-- or the data upload will NOT work!
-#upload_port = /dev/serial_port
-
-#board_build.filesystem = littlefs
+#upload_port = </dev/serial_port>
+#board_build.filesystem = <littlefs>|<spiffs>
+#build_flags =
+#\t-D DEBUG
+#
+#lib_ldf_mode = deep+
+#
+#lib_deps =
+;\t<select libraries with "PIO Home" -> Libraries
+#monitor_filters =
+#  esp8266_exception_decoder
 
 ;-- attiny85
 #platform = atmelavr
 #board = attiny85
+#framework = arduino
 #upload_protocol = usbtiny
 #upload_speed = 19200
 ;-- Clock source Int.RC Osc. 8MHz PWRDWN/RESET: 6 CK/1
@@ -814,10 +839,6 @@ default_envs = myBoard
 #
 #lib_deps =
 ;\t<select libraries with "PIO Home" -> Libraries
-
-#monitor_filters =
-;-- esp8266
-#  esp8266_exception_decoder
 """
         with open(platformio_ini_path, 'w') as f:
             f.write(platformio_ini_content)
@@ -828,11 +849,11 @@ default_envs = myBoard
 
 
 #------------------------------------------------------------------------------------------------------
-def move_struct_and_union_declarations():
+def move_struct_union_and_enum_declarations():
     logging.info("")
-    logging.info(f"Processing: move_struct_and_union_declarations() ")
+    logging.info(f"Processing: move_struct_union_and_enum_declarations() ")
 
-    global struct_and_union_added
+    global struct_union_and_enum_added
 
     search_folders = [glob_pio_src, glob_pio_include]
 
@@ -863,8 +884,8 @@ def move_struct_and_union_declarations():
                         with open(file_path, 'r') as file:
                             content = file.read()
 
-                        # Regular expression to match struct and union declarations
-                        declaration_pattern = r'\b(struct|union)\s+(?:\w+\s+)*(?:\w+\s*)?{'
+                        # Updated regular expression to match struct, union, and enum declarations, including 'typedef struct'
+                        declaration_pattern = r'\b(typedef\s+)?(struct|union|enum)\s+(?:\w+\s+)*(?:\w+\s*)?{'
 
                         modified_content = content
                         declarations_to_move = []
@@ -874,7 +895,7 @@ def move_struct_and_union_declarations():
                             end_pos = find_declaration_end(content, start_pos)
                             
                             if end_pos != -1:
-                                decl_type = match.group(1)  # 'struct' or 'union'
+                                decl_type = match.group(2)  # 'struct', 'union', or 'enum'
                                 decl = content[start_pos:end_pos]
                                 
                                 # Check if the declaration is globally defined (not inside a function)
@@ -890,7 +911,7 @@ def move_struct_and_union_declarations():
                                     comment_text = f"*** {decl_type} moved to arduinoGlue.h ***"
                                     commented_decl = f"/*\t\t\t\t{comment_text}\n{decl}\n*/"
                                     modified_content = modified_content.replace(content[start_pos:end_pos], commented_decl)
-                                    struct_and_union_added = True
+                                    struct_union_and_enum_added = True
 
                         # Write modified content back to the original file (File Under Test)
                         with open(file_path, 'w') as file:
@@ -906,11 +927,11 @@ def move_struct_and_union_declarations():
                                 header_guard_match = re.search(r'#ifndef\s+\w+\s+#define\s+\w+', arduinoGlue_content)
                                 if header_guard_match:
                                     header_guard_end = header_guard_match.end()
-                                    # Find the struct_and_union_marker after the header guard
-                                    struct_and_union_marker_pos = arduinoGlue_content.rfind(f"{struct_and_union_marker}", header_guard_end)
-                                    logging.info(f"\t\tstruct_and_union_marker_pos: {struct_and_union_marker_pos}")
-                                    if struct_and_union_marker_pos != -1:
-                                        insert_point = arduinoGlue_content.find('\n', struct_and_union_marker_pos) + 0
+                                    # Find the struct_union_and_enum_marker after the header guard
+                                    struct_union_and_enum_marker_pos = arduinoGlue_content.rfind(f"{struct_union_and_enum_marker}", header_guard_end)
+                                    logging.info(f"\t\tstruct_union_and_enum_marker_pos: {struct_union_and_enum_marker_pos}")
+                                    if struct_union_and_enum_marker_pos != -1:
+                                        insert_point = arduinoGlue_content.find('\n', struct_union_and_enum_marker_pos) + 0
                                     else:
                                         # If no #define found, insert after header guard
                                         insert_point = arduinoGlue_content.find('\n', header_guard_end) + 1
@@ -929,9 +950,9 @@ def move_struct_and_union_declarations():
                                 file.write(new_content)
                                 file.truncate()
 
-                            logging.info(f"\tMoved {len(declarations_to_move)} struct/union declaration(s) from [{os.path.basename(file_path)}] to arduinoGlue.h")
+                            logging.info(f"\tMoved {len(declarations_to_move)} struct/union/enum declaration(s) from [{os.path.basename(file_path)}] to arduinoGlue.h")
                         else:
-                            logging.info(f"\tNo global struct/union declarations found in [{os.path.basename(file_path)}]")
+                            logging.info(f"\tNo global struct/union/enum declarations found in [{os.path.basename(file_path)}]")
 
                     except FileNotFoundError:
                         logging.error(f"Error: File {file_path} not found.")
@@ -942,6 +963,8 @@ def move_struct_and_union_declarations():
                         line_number = exc_tb.tb_lineno
                         logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
                         exit()
+
+
 
 #------------------------------------------------------------------------------------------------------
 def extract_and_comment_defines():
@@ -1021,8 +1044,9 @@ def extract_and_comment_defines():
             for macro_name, macro_value in all_defines:
                 f.write(f"{macro_value}\n")
             f.write(f"\n{all_includes_marker}")
-            f.write(f"\n{struct_and_union_marker}")
+            f.write(f"\n{struct_union_and_enum_marker}")
             f.write(f"\n\n{extern_variables_marker}")
+            f.write(f"\n{global_pointer_arrays_marker}")
             f.write(f"\n{extern_classes_marker}")
             f.write(f"\n{prototypes_marker}")
             f.write(f"\n{convertor_marker}")
@@ -1380,7 +1404,7 @@ def extract_all_includes_from_file(file_path):
 
 
 #------------------------------------------------------------------------------------------------------
-def extract_global_variables(file_path):
+def extract_global_variablesSAVE(file_path):
     """
     Extract global variable definitions from a single .ino, .cpp, or header file.
     Only variables declared outside of all function blocks are considered global.
@@ -1497,6 +1521,208 @@ def extract_global_variables(file_path):
 
     return global_vars
 
+#------------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------------------------
+def extract_global_variables(file_path):
+    """
+    Extract global variable definitions from a single .ino, .cpp, or header file.
+    Only variables declared outside of all function blocks are considered global.
+    """
+    logging.info("")
+    logging.info(f"Processing: extract_global_variables() from : {os.path.basename(file_path)}")
+
+    global_vars = {}
+
+    # Get the fbase (filename without extension)
+    file = os.path.basename(file_path)
+    fbase = os.path.splitext(file)[0]
+
+    # Check if there are existing entries in dict_global_variables for this fbase
+    if fbase in dict_global_variables:
+        global_vars[fbase] = dict_global_variables[fbase]
+        logging.info(f"\t[1] Found {len(global_vars[fbase])} existing global variables for {fbase} in dict_global_variables")
+
+    # More flexible type pattern to match any type, including custom types and structs
+    type_pattern = r'(?:\w+(?:::\w+)*(?:\s*<[^>]+>)?(?:\s*\*)*)'
+
+    # Updated patterns to catch all types of variables and class instances, including static
+    var_pattern = rf'^\s*((?:static|volatile|const)?\s*{type_pattern})\s+((?:[a-zA-Z_]\w*(?:\[.*?\])?(?:\s*=\s*[^,;]+)?\s*,\s*)*[a-zA-Z_]\w*(?:\[.*?\])?(?:\s*=\s*[^,;]+)?)\s*;'
+    class_instance_pattern = rf'^\s*((?:static)?\s*{type_pattern})\s+([a-zA-Z_]\w*)(?:\s*\(.*?\))?\s*;'
+    func_pattern = rf'^\s*(?:static|volatile|const)?\s*{type_pattern}\s+([a-zA-Z_]\w*)\s*\((.*?)\)'
+    struct_pattern = r'^\s*struct\s+([a-zA-Z_]\w*)\s*{'
+
+    keywords = set(['if', 'else', 'for', 'while', 'do', 'switch', 'case', 'default',
+                    'break', 'continue', 'return', 'goto', 'typedef', 'struct', 'enum',
+                    'union', 'sizeof', 'volatile', 'register', 'extern', 'inline',
+                    'static', 'const', 'auto', 'virtual', 'void', 'class', 'public',
+                    'private', 'protected', 'template', 'namespace', 'using', 'friend',
+                    'operator', 'try', 'catch', 'throw', 'new', 'delete'])
+
+    control_structures = set(['if', 'else', 'for', 'while', 'do', 'switch', 'case'])
+
+    def is_in_string(line, pos):
+        """Check if the given position in the line is inside a string literal."""
+        in_single_quote = False
+        in_double_quote = False
+        escape = False
+        for i, char in enumerate(line):
+            if i >= pos:
+                return in_single_quote or in_double_quote
+            if escape:
+                escape = False
+                continue
+            if char == '\\':
+                escape = True
+            elif char == "'" and not in_double_quote:
+                in_single_quote = not in_single_quote
+            elif char == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+        return False
+
+    try:
+        with open(file_path, 'r') as f:
+            content = f.read()
+
+        lines = content.split('\n')
+        scope_stack = []
+        in_struct = False
+        current_struct = None
+        file_vars = []
+        custom_types = set()
+        potential_func_start = False
+        func_parentheses_count = 0
+        in_raw_string = False
+        raw_string_delimiter = ''
+
+        for line_num, line in enumerate(lines, 1):
+            stripped_line = line.strip()
+
+            # Skip empty lines and comments
+            if not stripped_line or stripped_line.startswith('//'):
+                continue
+
+            # Check for raw string literal start
+            if not in_raw_string and 'R"' in stripped_line:
+                raw_start = stripped_line.index('R"')
+                if not is_in_string(stripped_line, raw_start):
+                    in_raw_string = True
+                    delimiter_end = stripped_line.index('(', raw_start)
+                    raw_string_delimiter = stripped_line[raw_start+2:delimiter_end]
+
+            # Check for raw string literal end
+            if in_raw_string:
+                end_delimiter = ')"' + raw_string_delimiter
+                if end_delimiter in stripped_line:
+                    in_raw_string = False
+                    raw_string_delimiter = ''
+                continue  # Skip processing this line if we're in a raw string
+
+            # Check for control structures
+            first_word = stripped_line.split()[0] if stripped_line else ''
+            if first_word in control_structures:
+                scope_stack.append('control')
+
+            # Check for multi-line function declarations
+            if potential_func_start:
+                func_parentheses_count += stripped_line.count('(') - stripped_line.count(')')
+                if func_parentheses_count == 0:
+                    if stripped_line.endswith('{'):
+                        scope_stack.append('function')
+                    potential_func_start = False
+                continue
+
+            # Check for struct start
+            struct_match = re.search(struct_pattern, stripped_line)
+            if struct_match and not scope_stack:
+                in_struct = True
+                current_struct = struct_match.group(1)
+                custom_types.add(current_struct)
+                scope_stack.append('struct')
+
+            # Check for function start
+            func_match = re.search(func_pattern, stripped_line)
+            if func_match and not scope_stack:
+                if stripped_line.endswith('{'):
+                    scope_stack.append('function')
+                else:
+                    potential_func_start = True
+                    func_parentheses_count = stripped_line.count('(') - stripped_line.count(')')
+
+            # Count braces
+            if not potential_func_start:
+                open_braces = stripped_line.count('{')
+                close_braces = stripped_line.count('}')
+                
+                for _ in range(open_braces):
+                    if not scope_stack or scope_stack[-1] == 'brace':
+                        scope_stack.append('brace')
+                    
+                for _ in range(close_braces):
+                    if scope_stack and scope_stack[-1] == 'brace':
+                        scope_stack.pop()
+                    elif scope_stack:
+                        scope_stack.pop()
+                        if not scope_stack:
+                            in_struct = False
+                            current_struct = None
+
+            # Check for variable declarations only at global scope
+            if not scope_stack and not stripped_line.startswith('return'):
+                var_match = re.search(var_pattern, stripped_line)
+                class_instance_match = re.search(class_instance_pattern, stripped_line)
+                
+                if var_match and not is_in_string(line, var_match.start()):
+                    var_type = var_match.group(1).strip()
+                    var_declarations = re.findall(r'([a-zA-Z_]\w*(?:\[.*?\])?)(?:\s*=\s*[^,;]+)?', var_match.group(2))
+                    for var_name in var_declarations:
+                        base_name = var_name.split('[')[0].strip()
+                        if base_name.lower() not in keywords and not base_name.isdigit():
+                            # Check for pointer in var_type or var_name
+                            is_pointer = var_type.endswith('*') or var_name.startswith('*')
+                            
+                            # Remove asterisk from var_name if it starts with one
+                            if var_name.startswith('*'):
+                                var_name = var_name.lstrip('*').strip()
+                                if not var_type.endswith('*'):
+                                    var_type = var_type + '*'
+                            
+                            file_vars.append((var_type, var_name, None, is_pointer))
+                            logging.debug(f"\t[1] Global variable found: [{var_type} {var_name}]")
+                            if is_pointer:
+                                logging.debug(f"\t\t[1] Pointer variable detected: [{var_type} {var_name}]")
+                
+                elif class_instance_match and not is_in_string(line, class_instance_match.start()):
+                    var_type = class_instance_match.group(1).strip()
+                    var_name = class_instance_match.group(2).strip()
+                    if var_name.lower() not in keywords and not var_name.isdigit():
+                        file_vars.append((var_type, var_name, None, False))
+                        logging.debug(f"\t[1] Global class instance found: [{var_type} {var_name}]")
+
+        # Remove duplicate entries
+        unique_file_vars = list(set(file_vars))
+
+        # Add new global variables to the existing ones
+        if fbase in global_vars:
+            global_vars[fbase].extend(unique_file_vars)
+        else:
+            global_vars[fbase] = unique_file_vars
+
+        if unique_file_vars:
+            logging.info(f"\t[1] Processed {os.path.basename(file_path)} successfully. Found {len(unique_file_vars)} new global variables.")
+
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        line_number = exc_tb.tb_lineno
+        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
+        logging.error(f"\tError processing file {file_path}: {str(e)}")
+        exit()
+
+    if global_vars[fbase]:
+        logging.info(f"\t[1] Total global variables for {fbase}: {len(global_vars[fbase])}")
+    else:
+        logging.info("\t[1] No global variables found")
+
+    return global_vars
 
 #------------------------------------------------------------------------------------------------------
 def extract_constant_pointers(file_path):
@@ -1893,6 +2119,9 @@ def update_arduinoglue_with_global_variables(dict_global_variables):
             if vars_list:  # Only print for files that have global variables
                 for var_type, var_name, function, is_pointer in vars_list:
                     var_name += ';'
+                    if var_type.startswith("static "):
+                        logging.debug(f"\t\t\tFound static variable [{var_type}] (remove \'static\' part)")
+                        var_type = var_type.replace("static ", "").strip()  # Remove 'static' and any leading/trailing spaces
                     logging.debug(f"Added:\textern {var_type:<15} {var_name:<35}\t\t//-- from {file_path})")
                     new_content += (f"extern {var_type:<15} {var_name:<35}\t\t//-- from {file_path}\n")
                     extern_variables_added = True
@@ -1967,8 +2196,9 @@ def remove_unused_markers_from_arduinoGlue():
 
         markers = {
             all_includes_marker: 'all_includes_added',
-            struct_and_union_marker: 'struct_and_union_added',
+            struct_union_and_enum_marker: 'struct_union_and_enum_added',
             extern_variables_marker: 'extern_variables_added',
+            global_pointer_arrays_marker: 'global_pointer_arrays_added',
             extern_classes_marker: 'extern_classes_added',
             prototypes_marker: 'prototypes_added',
             convertor_marker: 'convertor_added'
@@ -2534,7 +2764,7 @@ def main():
         copy_data_folder()
         create_platformio_ini()
         extract_and_comment_defines()
-        move_struct_and_union_declarations()
+        move_struct_union_and_enum_declarations()
 
 
         search_folders = [glob_pio_src, glob_pio_include]
