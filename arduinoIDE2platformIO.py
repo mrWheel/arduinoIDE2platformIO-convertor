@@ -64,8 +64,8 @@ dict_includes             = {}
 platformio_marker         = "/PlatformIO"
 all_includes_marker       = "//============ Includes ===================="
 all_includes_added        = False
-struct_and_union_marker   = "//============ Structs & Unions ============"
-struct_and_union_added    = False
+struct_union_and_enum_marker  = "//============ Structs, Unions & Enums ============"
+struct_union_and_enum_added        = False
 extern_variables_marker   = "//============ Extern Variables ============"
 extern_variables_added    = False
 extern_classes_marker     = "//============ Extern Classes =============="
@@ -771,24 +771,47 @@ default_envs = myBoard
 ;-- esp32
 #platform = espressif32
 #board = esp32dev
+#framework = arduino
+#board_build.partitions = <min_spiffs.csv>
+#board_build.filesystem = <LittleFS>|<SPIFFS>
+#monitor_speed = 115200
+#upload_speed = 115200
+#build_flags =
+#\t-D DEBUG
+#
+#lib_ldf_mode = deep+
+#
+#lib_deps =
+;\t<select libraries with "PIO Home" -> Libraries
+
 ##-- you NEED the next line (with the correct port)
 ##-- or the data upload will NOT work!
-#upload_port = /dev/serial_port
-#board_build.partitions = min_spiffs.csv
-#board_build.filesystem = SPIFFS
+#upload_port = </dev/serial_port>
+#monitor_filters =
+#  esp32_exception_decoder
 
 ;-- esp8266
 #platform = espressif8266
 #board = esp12e
+#framework = arduino
 ##-- you NEED the next line (with the correct port)
 ##-- or the data upload will NOT work!
-#upload_port = /dev/serial_port
-
-#board_build.filesystem = littlefs
+#upload_port = </dev/serial_port>
+#board_build.filesystem = <littlefs>|<spiffs>
+#build_flags =
+#\t-D DEBUG
+#
+#lib_ldf_mode = deep+
+#
+#lib_deps =
+;\t<select libraries with "PIO Home" -> Libraries
+#monitor_filters =
+#  esp8266_exception_decoder
 
 ;-- attiny85
 #platform = atmelavr
 #board = attiny85
+#framework = arduino
 #upload_protocol = usbtiny
 #upload_speed = 19200
 ;-- Clock source Int.RC Osc. 8MHz PWRDWN/RESET: 6 CK/1
@@ -814,10 +837,6 @@ default_envs = myBoard
 #
 #lib_deps =
 ;\t<select libraries with "PIO Home" -> Libraries
-
-#monitor_filters =
-;-- esp8266
-#  esp8266_exception_decoder
 """
         with open(platformio_ini_path, 'w') as f:
             f.write(platformio_ini_content)
@@ -828,11 +847,11 @@ default_envs = myBoard
 
 
 #------------------------------------------------------------------------------------------------------
-def move_struct_and_union_declarations():
+def move_struct_union_and_enum_declarations():
     logging.info("")
-    logging.info(f"Processing: move_struct_and_union_declarations() ")
+    logging.info(f"Processing: move_struct_union_and_enum_declarations() ")
 
-    global struct_and_union_added
+    global struct_union_and_enum_added
 
     search_folders = [glob_pio_src, glob_pio_include]
 
@@ -863,8 +882,8 @@ def move_struct_and_union_declarations():
                         with open(file_path, 'r') as file:
                             content = file.read()
 
-                        # Regular expression to match struct and union declarations
-                        declaration_pattern = r'\b(struct|union)\s+(?:\w+\s+)*(?:\w+\s*)?{'
+                        # Regular expression to match struct, union, and enum declarations
+                        declaration_pattern = r'\b(struct|union|enum)\s+(?:\w+\s+)*(?:\w+\s*)?{'
 
                         modified_content = content
                         declarations_to_move = []
@@ -874,7 +893,7 @@ def move_struct_and_union_declarations():
                             end_pos = find_declaration_end(content, start_pos)
                             
                             if end_pos != -1:
-                                decl_type = match.group(1)  # 'struct' or 'union'
+                                decl_type = match.group(1)  # 'struct', 'union', or 'enum'
                                 decl = content[start_pos:end_pos]
                                 
                                 # Check if the declaration is globally defined (not inside a function)
@@ -890,7 +909,7 @@ def move_struct_and_union_declarations():
                                     comment_text = f"*** {decl_type} moved to arduinoGlue.h ***"
                                     commented_decl = f"/*\t\t\t\t{comment_text}\n{decl}\n*/"
                                     modified_content = modified_content.replace(content[start_pos:end_pos], commented_decl)
-                                    struct_and_union_added = True
+                                    struct_union_and_enum_added = True
 
                         # Write modified content back to the original file (File Under Test)
                         with open(file_path, 'w') as file:
@@ -906,11 +925,11 @@ def move_struct_and_union_declarations():
                                 header_guard_match = re.search(r'#ifndef\s+\w+\s+#define\s+\w+', arduinoGlue_content)
                                 if header_guard_match:
                                     header_guard_end = header_guard_match.end()
-                                    # Find the struct_and_union_marker after the header guard
-                                    struct_and_union_marker_pos = arduinoGlue_content.rfind(f"{struct_and_union_marker}", header_guard_end)
-                                    logging.info(f"\t\tstruct_and_union_marker_pos: {struct_and_union_marker_pos}")
-                                    if struct_and_union_marker_pos != -1:
-                                        insert_point = arduinoGlue_content.find('\n', struct_and_union_marker_pos) + 0
+                                    # Find the struct_union_and_enum_marker after the header guard
+                                    struct_union_and_enum_marker_pos = arduinoGlue_content.rfind(f"{struct_union_and_enum_marker}", header_guard_end)
+                                    logging.info(f"\t\tstruct_union_and_enum_marker_pos: {struct_union_and_enum_marker_pos}")
+                                    if struct_union_and_enum_marker_pos != -1:
+                                        insert_point = arduinoGlue_content.find('\n', struct_union_and_enum_marker_pos) + 0
                                     else:
                                         # If no #define found, insert after header guard
                                         insert_point = arduinoGlue_content.find('\n', header_guard_end) + 1
@@ -929,9 +948,9 @@ def move_struct_and_union_declarations():
                                 file.write(new_content)
                                 file.truncate()
 
-                            logging.info(f"\tMoved {len(declarations_to_move)} struct/union declaration(s) from [{os.path.basename(file_path)}] to arduinoGlue.h")
+                            logging.info(f"\tMoved {len(declarations_to_move)} struct/union/enum declaration(s) from [{os.path.basename(file_path)}] to arduinoGlue.h")
                         else:
-                            logging.info(f"\tNo global struct/union declarations found in [{os.path.basename(file_path)}]")
+                            logging.info(f"\tNo global struct/union/enum declarations found in [{os.path.basename(file_path)}]")
 
                     except FileNotFoundError:
                         logging.error(f"Error: File {file_path} not found.")
@@ -1021,7 +1040,7 @@ def extract_and_comment_defines():
             for macro_name, macro_value in all_defines:
                 f.write(f"{macro_value}\n")
             f.write(f"\n{all_includes_marker}")
-            f.write(f"\n{struct_and_union_marker}")
+            f.write(f"\n{struct_union_and_enum_marker}")
             f.write(f"\n\n{extern_variables_marker}")
             f.write(f"\n{extern_classes_marker}")
             f.write(f"\n{prototypes_marker}")
@@ -1967,7 +1986,7 @@ def remove_unused_markers_from_arduinoGlue():
 
         markers = {
             all_includes_marker: 'all_includes_added',
-            struct_and_union_marker: 'struct_and_union_added',
+            struct_union_and_enum_marker: 'struct_union_and_enum_added',
             extern_variables_marker: 'extern_variables_added',
             extern_classes_marker: 'extern_classes_added',
             prototypes_marker: 'prototypes_added',
@@ -2534,7 +2553,7 @@ def main():
         copy_data_folder()
         create_platformio_ini()
         extract_and_comment_defines()
-        move_struct_and_union_declarations()
+        move_struct_union_and_enum_declarations()
 
 
         search_folders = [glob_pio_src, glob_pio_include]
