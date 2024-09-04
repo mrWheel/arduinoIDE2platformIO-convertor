@@ -5,7 +5,7 @@ This Python script automates the process of converting an Arduino IDE project to
 For more information look <a href="https://willem.aandewiel.nl/index.php/2024/08/16/arduino-to-platformio-project-conversion/">here</a>.
 
 ## To Do (If you want to help, please create a merge request)
-- `struct` definitions should als be 'commented out' and placed in `arduinoGlue.h`
+- ~~`struct` definitions should als be 'commented out' and placed in `arduinoGlue.h`~~
 - Array declarations in the form
   ```
       char actualTableArray[][35] = { "timestamp"
@@ -19,7 +19,7 @@ For more information look <a href="https://willem.aandewiel.nl/index.php/2024/08
      ```
 - A run-option to name the `arduinoGlue.h` file to your liking.
 - A run-option to place the `PlatformIO` folder anywhere you want (and not inside the Arduino program folder).
-- More testing (f.i. does the `--project_dir` option works - never tested it myself).
+- ~~More testing (f.i. does the `--project_dir` option works - never tested it myself).~~
 - Macros like
   ```
   #ifdef xyz
