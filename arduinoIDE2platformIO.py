@@ -872,6 +872,21 @@ def move_struct_union_and_enum_declarations():
                     return start_pos + i + 1
         return -1
 
+    def is_in_comment(content, pos):
+        # Check for single-line comment
+        line_start = content.rfind('\n', 0, pos) + 1
+        if '//' in content[line_start:pos]:
+            return True
+
+        # Check for multi-line comment
+        last_comment_start = content.rfind('/*', 0, pos)
+        if last_comment_start != -1:
+            comment_end = content.find('*/', last_comment_start)
+            if comment_end == -1 or comment_end > pos:
+                return True
+
+        return False
+
     for folder in search_folders:
         for root, _, files in os.walk(folder):
             for file in files:
@@ -892,6 +907,11 @@ def move_struct_union_and_enum_declarations():
 
                         for match in re.finditer(declaration_pattern, content):
                             start_pos = match.start()
+                            
+                            # Skip if the declaration is inside a comment
+                            if is_in_comment(content, start_pos):
+                                continue
+
                             end_pos = find_declaration_end(content, start_pos)
                             
                             if end_pos != -1:
@@ -963,7 +983,6 @@ def move_struct_union_and_enum_declarations():
                         line_number = exc_tb.tb_lineno
                         logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
                         exit()
-
 
 
 #------------------------------------------------------------------------------------------------------
