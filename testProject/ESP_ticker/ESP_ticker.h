@@ -115,11 +115,11 @@ uint8_t   settingNewsInterval, settingNewsMaxMsg;
 bool      LittleFSmounted = false;
 FSInfo    LittleFSinfo;
 time_t    now; 
-struct tm* timeinfo = {0};
+struct tm timeinfo;
 bool      timeSynced = false;
 
 
-TimeSyncClass        timeSync;
+TimeSync        timeSync;
 
 const char *weekDayName[]  {  "Unknown", "Zondag", "Maandag", "Dinsdag", "Woensdag"
                             , "Donderdag", "Vrijdag", "Zaterdag", "Unknown" };

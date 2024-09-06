@@ -6,7 +6,7 @@
 #
 #   by        : Willem Aandewiel
 #
-#   Version   : v0.78 (03-09-2024)
+#   Version   : v0.79 (06-09-2024)
 #
 #------------------------------------------------------------
 import os
@@ -64,6 +64,8 @@ dict_includes             = {}
 platformio_marker         = "/PlatformIO"
 all_includes_marker       = "//============ Includes ===================="
 all_includes_added        = False
+all_defines_marker        = "//============ Defines & Macros===================="
+all_defines_added         = False
 struct_union_and_enum_marker  = "//============ Structs, Unions & Enums ============"
 struct_union_and_enum_added        = False
 global_pointer_arrays_marker  = "//============ Pointer Arrays ============"
@@ -193,7 +195,36 @@ def short_path(directory_path):
         return f"../{glob_project_name}{part_of_path}"
     else:
         return f"{directory_path}"
-    
+
+#------------------------------------------------------------------------------------------------------
+def create_arduinoglue_file():
+    """
+    Create arduinoGlue.h file with necessary markers and header guards.
+    """
+    try:
+        all_defines_path = os.path.join(glob_pio_include, 'arduinoGlue.h')
+        logging.info(f"\tCreating arduinoGlue.h")
+        with open(all_defines_path, 'w') as f:
+            f.write("#ifndef ARDUINOGLUE_H\n#define ARDUINOGLUE_H\n\n")
+            f.write(f"\n{all_includes_marker}")
+            f.write(f"\n{all_defines_marker}")
+            f.write(f"\n\n{struct_union_and_enum_marker}")
+            f.write(f"\n{extern_variables_marker}")
+            f.write(f"\n{global_pointer_arrays_marker}")
+            f.write(f"\n{extern_classes_marker}")
+            f.write(f"\n{prototypes_marker}")
+            f.write(f"\n{convertor_marker}")
+            f.write("\n#endif // ARDUINOGLUE_H\n")
+
+        logging.info(f"\tSuccessfully created {short_path(all_defines_path)}")
+
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        line_number = exc_tb.tb_lineno
+        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
+        logging.error(f"\tError creating arduinoGlue.h: {str(e)}")
+        exit()
+
 #------------------------------------------------------------------------------------------------------
 def find_marker_position(content, prio_marker):
 
@@ -985,12 +1016,13 @@ def move_struct_union_and_enum_declarations():
                         exit()
 
 
+"""
 #------------------------------------------------------------------------------------------------------
 def extract_and_comment_defines():
-    """
+    "" "
     Extract all #define statements (including functional and multi-line) from .h, .ino, and .cpp files,
     create arduinoGlue.h, and comment original statements with info.
-    """
+    "" "
     logging.info("")
     logging.info(f"Searching for #define statements in {short_path(glob_pio_folder)}")
 
@@ -1082,6 +1114,100 @@ def extract_and_comment_defines():
         exit()
 
     logging.info(f"\tExtracted {len(all_defines)} #define statements")
+"""
+#------------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------------------------
+def extract_and_comment_defines():
+    """
+    Extract all #define statements (including functional and multi-line) from .h, .ino, and .cpp files,
+    comment original statements with info, and insert them into arduinoGlue.h after the all_defines_marker.
+    """
+    logging.info("")
+    logging.info(f"Searching for #define statements in {short_path(glob_pio_folder)}")
+
+    try:
+        all_defines = []
+        define_pattern = r'^\s*#define\s+(\w+)(?:\(.*?\))?\s*(.*?)(?:(?=\\\n)|$)'
+
+        # Only search within glob_pio_src and glob_pio_include folders
+        search_folders = [glob_pio_src, glob_pio_include]
+
+        for folder in search_folders:
+            for root, _, files in os.walk(folder):
+                for file in files:
+                    if file.endswith(('.h', '.ino')):
+                        file_path = os.path.join(root, file)
+                        logging.debug(f"\tProcessing file: {short_path(file_path)}")
+                        with open(file_path, 'r') as f:
+                            content = f.read()
+
+                        new_content = []
+                        lines = content.split('\n')
+                        i = 0
+                        while i < len(lines):
+                            line = lines[i]
+                            match = re.match(define_pattern, line)
+                            if match:
+                                macro_name = match.group(1)
+                                macro_value = match.group(2)
+                                full_define = [line]
+
+                                # Check for multi-line defines
+                                while macro_value.endswith('\\') and i + 1 < len(lines):
+                                    i += 1
+                                    next_line = lines[i]
+                                    full_define.append(next_line)
+                                    macro_value += '\n' + next_line.strip()
+                                    
+                                # Add the closing line if it's not already included
+                                if i + 1 < len(lines) and not macro_value.endswith('\\'):
+                                    i += 1
+                                    closing_line = lines[i]
+                                    if closing_line.strip().startswith(')'):
+                                        full_define.append(closing_line)
+                                        macro_value += '\n' + closing_line.strip()
+                                    else:
+                                        i -= 1  # If it's not a closing parenthesis, go back one line
+
+                                # Don't include header guards
+                                if not macro_name.endswith('_H'):
+                                    all_defines.append('\n'.join(full_define))
+                                    # Comment out the original #define with info
+                                    new_content.extend([f"\t//-- moved to arduinoGlue.h // {line}" for line in full_define])
+                                    logging.debug(f"\tAdded #define: {macro_name}")
+                                else:
+                                    new_content.extend(full_define)
+                            else:
+                                new_content.append(line)
+                            i += 1
+
+                        # Write the modified content back to the file
+                        with open(file_path, 'w') as f:
+                            f.write('\n'.join(new_content))
+                        logging.debug(f"\tUpdated {file} with commented out #defines")
+
+        # Insert all defines into arduinoGlue.h after the all_defines_marker
+        all_defines_path = os.path.join(glob_pio_include, 'arduinoGlue.h')
+        with open(all_defines_path, 'r') as f:
+            content = f.read()
+
+        marker_index = content.find(all_defines_marker)
+        if marker_index != -1:
+            new_content = (content[:marker_index + len(all_defines_marker)] + 
+                           '\n' + '\n'.join(all_defines) + 
+                           content[marker_index + len(all_defines_marker):])
+            
+            with open(all_defines_path, 'w') as f:
+                f.write(new_content)
+
+        logging.info(f"\tInserted {len(all_defines)} #define statements into {short_path(all_defines_path)}")
+
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        line_number = exc_tb.tb_lineno
+        logging.error(f"\tAn error occurred at line {line_number}: {str(e)}")
+        logging.error(f"\tError extracting and inserting #define statements: {str(e)}")
+        exit()
 
 #------------------------------------------------------------------------------------------------------
 def add_markers_to_header_file(file_path):
@@ -1784,10 +1910,8 @@ def extract_undefined_vars_in_file(file_path):
                         'defined_in': defined_in,
                         'line': line_number
                     }
-                    if args.debug:
-                        logging.info(f"Added usage of {global_var_name} to undefined_vars: {undefined_vars[key]}")
-                    #else:
-                    #    logging.info(f"Added usage of {global_var_name} to undefined_vars")
+                    logging.debug(f"Added usage of {global_var_name} to undefined_vars: {undefined_vars[key]}")
+
             elif not var_found or var_type == 'Unknown':
                 logging.debug(f"Variable {var} not found in dict_global_variables or has unknown type, skipping")
     
@@ -2108,7 +2232,7 @@ def remove_unused_markers_from_arduinoGlue():
         all_markers = '|'.join(re.escape(m) for m in markers.keys())
 
         for marker, test_var in markers.items():
-            logging.info(f"\tChecking marker: {marker}")
+            logging.debug(f"\tChecking marker: {marker}")
             if not globals().get(test_var, False):
                 logging.info(f"\tRemoving unused marker: {marker}")
                 # Pattern to match from this marker to the next marker or #endif
@@ -2663,6 +2787,7 @@ def main():
         copy_project_files()
         copy_data_folder()
         create_platformio_ini()
+        create_arduinoglue_file()
         extract_and_comment_defines()
         move_struct_union_and_enum_declarations()
 

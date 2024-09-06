@@ -4,7 +4,7 @@
 
 #include "TimeSyncClass.h"
 
-TimeSyncClass::TimeSyncClass() {}
+TimeSync::TimeSync() {}
 
 /**
  * Sets up the time synchronization with the specified timezone.
@@ -15,7 +15,7 @@ TimeSyncClass::TimeSyncClass() {}
  *
  * @throws None
  */
-void TimeSyncClass::setup(const char *timeZone)
+void TimeSync::setup(const char *timeZone)
 {
   configTime(0, 0, "pool.ntp.org", "time.nist.gov",  "time.google.com");
   setenv("TZ", timeZone, 1);
@@ -31,7 +31,7 @@ void TimeSyncClass::setup(const char *timeZone)
  *
  * @throws None
  */
-bool TimeSyncClass::isSynced()
+bool TimeSync::isSynced()
 {
   time_t now;
   time(&now);
@@ -49,7 +49,7 @@ bool TimeSyncClass::isSynced()
  *
  * @throws None
  */
-bool TimeSyncClass::sync(uint16_t maxTry)
+bool TimeSync::sync(uint16_t maxTry)
 {
   time_t now;
   time(&now);
@@ -82,11 +82,11 @@ bool TimeSyncClass::sync(uint16_t maxTry)
  *
  * @throws None
  */
-void TimeSyncClass::logTime()
+void TimeSync::logTime()
 {
   time_t now;
   time(&now);
-  struct tm timeinfo = {0};
+  struct tm timeinfo;
 
   if (localtime(&now)->tm_year <= 120)
   {
