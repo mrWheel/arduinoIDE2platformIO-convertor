@@ -1,3 +1,32 @@
+#------------------------------------------------------------
+#
+#   X-Reference a arduinoGlue.h file
+# 
+#   file name : crossReference.py   
+#
+#   by        : Willem Aandewiel
+#
+#   Version   : v0.79 (07-09-2024)
+#
+#   Usage: python3 crossReference.py <path to PlatformIO project
+#
+#   input file : arduinoGlue.h
+#   output file: arduinoGlue.h (modified)
+#
+#   This program tries to determine what extern declared variables
+#   are used in the source files. If not used in any other file
+#   than the one where the variable is declared it will be commented out.
+#
+#   It does more-or-less the same for prototype functions
+# 
+#   It is to the user to remove "not used" variables or prototypes.
+#   For prototypes it can me nessesary to move the prototypes to the
+#   header file of the .cpp file.
+#
+#   license   : MIT (see at the bottom of this file)
+#------------------------------------------------------------
+
+
 import sys
 import os
 import re
@@ -143,3 +172,29 @@ if __name__ == "__main__":
     
     project_path = sys.argv[1]
     process_arduino_project(project_path)
+
+
+#*******************************************************************************************
+# MIT License
+# 
+#  Copyright (c) 2024 Willem Aandewiel
+#
+#  Permission is hereby granted, free of charge, to any person obtaining a copy
+#  of this software and associated documentation files (the "Software"), to deal
+#  in the Software without restriction, including without limitation the rights
+#  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#  copies of the Software, and to permit persons to whom the Software is
+#  furnished to do so, subject to the following conditions:
+#  
+#  The above copyright notice and this permission notice shall be included in all
+#  copies or substantial portions of the Software.
+#  
+#  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+#  SOFTWARE.
+#************************************************************************************************
+
