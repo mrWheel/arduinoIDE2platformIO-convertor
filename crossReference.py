@@ -32,7 +32,7 @@ import os
 import re
 import logging
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='- %(levelname)s - %(message)s')
 
 def process_extern_variables(arduino_glue_content, src_folder):
     extern_pattern = re.compile(r'extern\s+(\w+)\s+(\w+)')
@@ -126,8 +126,8 @@ def process_prototypes(arduino_glue_content, src_folder):
 
 def process_arduino_project(project_path):
     try:
-        arduino_glue_path = os.path.join(project_path, 'include', 'arduinoGlue_org.h')
-        temp_path = os.path.join(project_path, 'include', 'tempGlue.h')
+        arduino_glue_path = os.path.join(project_path, 'include', 'arduinoGlue.h')
+        temp_path = os.path.join(project_path, 'include', 'modifiedGlue.h')
         src_folder = os.path.join(project_path, 'src')
         
         logging.info(f"arduinoGlue.h: {arduino_glue_path}")
