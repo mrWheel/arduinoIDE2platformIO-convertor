@@ -6,12 +6,12 @@
 #
 #   by        : Willem Aandewiel
 #
-#   Version   : v0.79 (07-09-2024)
+#   Version   : v0.81 (04-10-2024)
 #
 #   Usage: python3 crossReference.py <path to PlatformIO project
 #
 #   input file : arduinoGlue.h
-#   output file: arduinoGlue.h (modified)
+#   output file: modifiedGlue.h (modified)
 #
 #   This program tries to determine what extern declared variables
 #   are used in the source files. If not used in any other file
